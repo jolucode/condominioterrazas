@@ -22,14 +22,20 @@ class Cliente extends ModeloBase {
      */
     public function buscar($termino) {
         $sql = "SELECT * FROM {$this->tabla} 
-                WHERE nombres LIKE :termino 
-                OR apellidos LIKE :termino 
-                OR dni LIKE :termino 
-                OR numero_lote LIKE :termino 
-                OR correo LIKE :termino
+                WHERE nombres LIKE :termino1 
+                OR apellidos LIKE :termino2 
+                OR dni LIKE :termino3 
+                OR numero_lote LIKE :termino4 
+                OR correo LIKE :termino5
                 ORDER BY apellidos, nombres";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([':termino' => "%{$termino}%"]);
+        $stmt->execute([
+            ':termino1' => "%{$termino}%",
+            ':termino2' => "%{$termino}%",
+            ':termino3' => "%{$termino}%",
+            ':termino4' => "%{$termino}%",
+            ':termino5' => "%{$termino}%"
+        ]);
         return $stmt->fetchAll();
     }
     
@@ -65,7 +71,11 @@ class Cliente extends ModeloBase {
         // Obtener total
         $sql_count = str_replace("SELECT *", "SELECT COUNT(*) as total", $sql);
         $stmt_count = $this->db->prepare($sql_count);
-        $stmt_count->execute($params);
+        if (!empty($params)) {
+            $stmt_count->execute($params);
+        } else {
+            $stmt_count->execute();
+        }
         $total = $stmt_count->fetch()['total'];
 
         // Obtener registros
@@ -73,7 +83,11 @@ class Cliente extends ModeloBase {
         $por_pagina = intval($por_pagina);
         $sql .= " ORDER BY id DESC LIMIT {$por_pagina} OFFSET {$offset}";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        if (!empty($params)) {
+            $stmt->execute($params);
+        } else {
+            $stmt->execute();
+        }
 
         return [
             'datos' => $stmt->fetchAll(),

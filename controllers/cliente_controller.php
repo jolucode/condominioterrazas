@@ -15,6 +15,9 @@ switch ($accion) {
     case 'listar':
         listarClientes();
         break;
+    case 'listar_ajax':
+        listarClientesAjax();
+        break;
     case 'crear':
         crearCliente();
         break;
@@ -43,8 +46,11 @@ function listarClientes() {
     $params = [];
     
     if ($busqueda) {
-        $filtro = "(nombres LIKE :busqueda OR apellidos LIKE :busqueda OR dni LIKE :busqueda OR numero_lote LIKE :busqueda)";
-        $params[':busqueda'] = "%{$busqueda}%";
+        $filtro = "(nombres LIKE :busq1 OR apellidos LIKE :busq2 OR dni LIKE :busq3 OR numero_lote LIKE :busq4)";
+        $params[':busq1'] = "%{$busqueda}%";
+        $params[':busq2'] = "%{$busqueda}%";
+        $params[':busq3'] = "%{$busqueda}%";
+        $params[':busq4'] = "%{$busqueda}%";
     }
     
     if ($estado) {
@@ -80,25 +86,25 @@ function listarClientes() {
         
         <div class="card-body">
             <!-- Filtros -->
-            <form method="GET" class="filters-bar mb-3">
-                <input type="hidden" name="accion" value="listar">
+            <div class="filters-bar mb-3">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" name="busqueda" class="form-control" placeholder="Buscar por nombre, DNI o lote..." 
+                    <input type="text" id="busqueda-input" class="form-control" placeholder="Buscar por nombre, DNI o lote... (búsqueda en vivo)"
                            value="<?php echo isset($_GET['busqueda']) ? $_GET['busqueda'] : ''; ?>">
                 </div>
-                <select name="estado" class="form-control">
+                <select id="estado-select" class="form-control">
                     <option value="">Todos los estados</option>
                     <option value="activo" <?php echo (isset($_GET['estado']) && $_GET['estado'] === 'activo') ? 'selected' : ''; ?>>Activos</option>
                     <option value="inactivo" <?php echo (isset($_GET['estado']) && $_GET['estado'] === 'inactivo') ? 'selected' : ''; ?>>Inactivos</option>
                 </select>
-                <button type="submit" class="btn btn-outline btn-sm">
-                    <i class="fas fa-filter"></i> Filtrar
-                </button>
-            </form>
+            </div>
             
+            <input type="hidden" id="current-page" value="1">
+            <input type="hidden" id="base-url" value="<?php echo APP_URL; ?>">
+
             <!-- Tabla -->
-            <?php if (!empty($clientes)): ?>
+            <div id="clientes-table-container">
+                <?php if (!empty($clientes)): ?>
                 <div class="table-container">
                     <table class="table">
                         <thead>
@@ -174,12 +180,182 @@ function listarClientes() {
                     <p>Intenta con otros filtros o registra un nuevo cliente</p>
                 </div>
             <?php endif; ?>
+            </div>
         </div>
     </div>
     
+    <script>
+    (function() {
+        const busquedaInput = document.getElementById('busqueda-input');
+        const estadoSelect = document.getElementById('estado-select');
+        const currentPageInput = document.getElementById('current-page');
+        const container = document.getElementById('clientes-table-container');
+        const baseUrl = document.getElementById('base-url').value;
+        let searchTimeout;
+        
+        function cargarClientes(pagina = 1) {
+            const busqueda = encodeURIComponent(busquedaInput.value);
+            const estado = encodeURIComponent(estadoSelect.value);
+            
+            const url = `${baseUrl}/controllers/cliente_controller.php?accion=listar_ajax&pagina=${pagina}&busqueda=${busqueda}&estado=${estado}`;
+            
+            container.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+            
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    container.innerHTML = html;
+                    currentPageInput.value = pagina;
+                })
+                .catch(error => {
+                    container.innerHTML = '<div class="alert alert-danger">Error al cargar los datos</div>';
+                });
+        }
+        
+        // Live search con debounce
+        busquedaInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                cargarClientes(1);
+            }, 400);
+        });
+        
+        // Filtrar por estado
+        estadoSelect.addEventListener('change', function() {
+            cargarClientes(1);
+        });
+        
+        // Paginación AJAX
+        container.addEventListener('click', function(e) {
+            const paginationLink = e.target.closest('.pagination a');
+            if (paginationLink) {
+                e.preventDefault();
+                const url = new URL(paginationLink.href);
+                const pagina = url.searchParams.get('pagina');
+                if (pagina) {
+                    cargarClientes(parseInt(pagina));
+                }
+            }
+        });
+    })();
+    </script>
+
     <?php
     $contenido = ob_get_clean();
     vista('partials/admin-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
+}
+
+function listarClientesAjax() {
+    global $modelo_cliente;
+    
+    $pagina = intval($_GET['pagina'] ?? 1);
+    $busqueda = sanear($_GET['busqueda'] ?? '');
+    $estado = sanear($_GET['estado'] ?? '');
+    
+    $filtro = '';
+    $params = [];
+    
+    if ($busqueda) {
+        $filtro = "(nombres LIKE :busq1 OR apellidos LIKE :busq2 OR dni LIKE :busq3 OR numero_lote LIKE :busq4)";
+        $params[':busq1'] = "%{$busqueda}%";
+        $params[':busq2'] = "%{$busqueda}%";
+        $params[':busq3'] = "%{$busqueda}%";
+        $params[':busq4'] = "%{$busqueda}%";
+    }
+    
+    if ($estado) {
+        if ($filtro) {
+            $filtro .= " AND estado = :estado";
+        } else {
+            $filtro = "estado = :estado";
+        }
+        $params[':estado'] = $estado;
+    }
+    
+    $resultado = $modelo_cliente->listarPaginado($pagina, 15, $filtro, $params);
+    $clientes = $resultado['datos'];
+    $paginacion = $resultado['paginacion'];
+    
+    ob_start();
+    
+    if (!empty($clientes)): ?>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombres y Apellidos</th>
+                        <th>DNI</th>
+                        <th>Teléfono</th>
+                        <th>Lote</th>
+                        <th>Correo</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($clientes as $cliente): ?>
+                        <tr>
+                            <td><?php echo $cliente['id']; ?></td>
+                            <td><?php echo $cliente['nombres'] . ' ' . $cliente['apellidos']; ?></td>
+                            <td><?php echo $cliente['dni']; ?></td>
+                            <td><?php echo $cliente['telefono'] ?: '-'; ?></td>
+                            <td><?php echo $cliente['numero_lote']; ?></td>
+                            <td><?php echo $cliente['correo'] ?: '-'; ?></td>
+                            <td>
+                                <span class="badge <?php echo $cliente['estado'] === 'activo' ? 'badge-success' : 'badge-danger'; ?>">
+                                    <?php echo ucfirst($cliente['estado']); ?>
+                                </span>
+                            </td>
+                            <td class="actions">
+                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=ver&id=<?php echo $cliente['id']; ?>" 
+                                   class="btn btn-outline btn-sm" title="Ver">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>" 
+                                   class="btn btn-outline btn-sm" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=eliminar&id=<?php echo $cliente['id']; ?>" 
+                                   class="btn btn-sm btn-danger" title="Eliminar"
+                                   data-confirm-delete="¿Está seguro de eliminar este cliente?">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <?php if ($paginacion['total_paginas'] > 1): ?>
+            <div class="pagination">
+                <?php if ($paginacion['tiene_anterior']): ?>
+                    <a href="?pagina=<?php echo $paginacion['pagina_actual'] - 1; ?>">
+                        <i class="fas fa-chevron-left"></i> Anterior
+                    </a>
+                <?php endif; ?>
+                
+                <span class="active"><?php echo $paginacion['pagina_actual']; ?></span>
+                
+                <?php if ($paginacion['tiene_siguiente']): ?>
+                    <a href="?pagina=<?php echo $paginacion['pagina_actual'] + 1; ?>">
+                        Siguiente <i class="fas fa-chevron-right"></i>
+                    </a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
+    <?php else: ?>
+        <div class="empty-state">
+            <i class="fas fa-users"></i>
+            <h3>No se encontraron clientes</h3>
+            <p>Intenta con otros filtros</p>
+        </div>
+    <?php endif;
+    
+    echo ob_get_clean();
+    exit;
 }
 
 function crearCliente() {

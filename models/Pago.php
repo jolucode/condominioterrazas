@@ -34,50 +34,66 @@ class Pago extends ModeloBase {
      * Obtener todos los pagos con filtros
      */
     public function obtenerConFiltros($filtros = [], $pagina = 1, $por_pagina = 15) {
-        $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre, 
-                       c.dni as cliente_dni, c.numero_lote
-                FROM {$this->tabla} p
-                INNER JOIN clientes c ON p.cliente_id = c.id
-                WHERE 1=1";
+        // Construir WHERE y params una sola vez para reutilizar
+        $whereClauses = ["1=1"];
         $params = [];
-        
+
         if (!empty($filtros['cliente_id'])) {
-            $sql .= " AND p.cliente_id = :cliente_id";
-            $params[':cliente_id'] = $filtros['cliente_id'];
+            $whereClauses[] = "p.cliente_id = :cliente_id";
+            $params[':cliente_id'] = intval($filtros['cliente_id']);
         }
-        
+
         if (!empty($filtros['estado'])) {
-            $sql .= " AND p.estado = :estado";
-            $params[':estado'] = $filtros['estado'];
+            $whereClauses[] = "p.estado = :estado";
+            $params[':estado'] = strval($filtros['estado']);
         }
-        
+
         if (!empty($filtros['mes'])) {
-            $sql .= " AND p.mes = :mes";
-            $params[':mes'] = $filtros['mes'];
+            $mes = intval($filtros['mes']);
+            if ($mes > 0) {
+                $whereClauses[] = "p.mes = :mes";
+                $params[':mes'] = $mes;
+            }
         }
-        
+
         if (!empty($filtros['anio'])) {
-            $sql .= " AND p.anio = :anio";
-            $params[':anio'] = $filtros['anio'];
+            $anio = intval($filtros['anio']);
+            if ($anio > 0) {
+                $whereClauses[] = "p.anio = :anio";
+                $params[':anio'] = $anio;
+            }
         }
-        
+
         if (!empty($filtros['busqueda'])) {
-            $sql .= " AND (c.nombres LIKE :busqueda OR c.apellidos LIKE :busqueda OR c.dni LIKE :busqueda)";
-            $params[':busqueda'] = "%{$filtros['busqueda']}%";
+            $whereClauses[] = "(c.nombres LIKE :busq1 OR c.apellidos LIKE :busq2 OR c.dni LIKE :busq3)";
+            $params[':busq1'] = "%{$filtros['busqueda']}%";
+            $params[':busq2'] = "%{$filtros['busqueda']}%";
+            $params[':busq3'] = "%{$filtros['busqueda']}%";
         }
+
+        $whereSQL = "WHERE " . implode(" AND ", $whereClauses);
+
+        // Query para contar
+        $sql_count = "SELECT COUNT(*) as total
+                FROM pagos p
+                INNER JOIN clientes c ON p.cliente_id = c.id
+                {$whereSQL}";
         
-        // Obtener total
-        $sql_count = str_replace("SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre, 
-                       c.dni as cliente_dni, c.numero_lote", "SELECT COUNT(*) as total", $sql);
         $stmt_count = $this->db->prepare($sql_count);
         $stmt_count->execute($params);
         $total = $stmt_count->fetch()['total'];
-        
-        // Ordenar y paginar
-        $sql .= " ORDER BY p.id DESC";
+
+        // Query principal con paginación
         $offset = intval(($pagina - 1) * $por_pagina);
         $por_pagina = intval($por_pagina);
-        $sql .= " LIMIT {$por_pagina} OFFSET {$offset}";
+        
+        $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                       c.dni as cliente_dni, c.numero_lote
+                FROM pagos p
+                INNER JOIN clientes c ON p.cliente_id = c.id
+                {$whereSQL}
+                ORDER BY p.id DESC
+                LIMIT {$por_pagina} OFFSET {$offset}";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);

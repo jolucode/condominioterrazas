@@ -144,9 +144,13 @@ class Reunion extends ModeloBase {
             $sql_count .= " WHERE estado = :estado";
         }
         $stmt_count = $this->db->prepare($sql_count);
-        $stmt_count->execute($params);
+        if (!empty($params)) {
+            $stmt_count->execute($params);
+        } else {
+            $stmt_count->execute();
+        }
         $total = $stmt_count->fetch()['total'];
-        
+
         // Obtener registros
         $sql .= " ORDER BY r.fecha_reunion DESC";
         $offset = intval(($pagina - 1) * $por_pagina);
@@ -154,7 +158,11 @@ class Reunion extends ModeloBase {
         $sql .= " LIMIT {$por_pagina} OFFSET {$offset}";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        if (!empty($params)) {
+            $stmt->execute($params);
+        } else {
+            $stmt->execute();
+        }
         
         return [
             'datos' => $stmt->fetchAll(),
