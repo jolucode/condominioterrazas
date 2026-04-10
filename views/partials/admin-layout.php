@@ -64,7 +64,7 @@
         </div>
     </div>
     
-    <script src="<?php echo APP_URL; ?>/assets/js/main.js"></script>
+    <script src="<?php echo APP_URL; ?>/assets/js/main.js?v=2"></script>
     <?php if (isset($js_extra)): ?>
         <?php foreach ($js_extra as $js): ?>
             <script src="<?php echo APP_URL . $js; ?>"></script>

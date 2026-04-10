@@ -30,6 +30,9 @@ switch ($accion) {
     case 'generar_pagos':
         generarPagosMensuales();
         break;
+    case 'listar_ajax':
+        listarPagosAjax();
+        break;
     default:
         redirigir('controllers/pago_controller.php?accion=listar');
         break;
@@ -88,36 +91,36 @@ function listarPagos() {
         
         <div class="card-body">
             <!-- Filtros -->
-            <form method="GET" class="filters-bar mb-3">
-                <input type="hidden" name="accion" value="listar">
+            <form id="form-filtros-pagos" onsubmit="return false;" class="filters-bar mb-3">
+                <input type="hidden" id="current-page" value="1">
+                <input type="hidden" id="base-url" value="<?php echo APP_URL; ?>">
+                
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" name="busqueda" class="form-control" placeholder="Buscar por nombre o DNI..." 
+                    <input type="text" id="busqueda-input" class="form-control" placeholder="Buscar por nombre o DNI..." 
                            value="<?php echo $busqueda; ?>">
                 </div>
-                <select name="estado" class="form-control">
+                <select id="estado-select" class="form-control">
                     <option value="">Todos los estados</option>
                     <option value="pendiente" <?php echo $estado === 'pendiente' ? 'selected' : ''; ?>>Pendientes</option>
                     <option value="pagado" <?php echo $estado === 'pagado' ? 'selected' : ''; ?>>Pagados</option>
                     <option value="vencido" <?php echo $estado === 'vencido' ? 'selected' : ''; ?>>Vencidos</option>
                 </select>
-                <select name="mes" class="form-control">
+                <select id="mes-select" class="form-control">
                     <option value="">Todos los meses</option>
                     <?php for ($m = 1; $m <= 12; $m++): ?>
                         <option value="<?php echo $m; ?>" <?php echo $mes === $m ? 'selected' : ''; ?>><?php echo nombreMes($m); ?></option>
                     <?php endfor; ?>
                 </select>
-                <select name="anio" class="form-control">
+                <select id="anio-select" class="form-control">
                     <?php for ($a = date('Y'); $a >= date('Y') - 2; $a--): ?>
                         <option value="<?php echo $a; ?>" <?php echo $anio === $a ? 'selected' : ''; ?>><?php echo $a; ?></option>
                     <?php endfor; ?>
                 </select>
-                <button type="submit" class="btn btn-outline btn-sm">
-                    <i class="fas fa-filter"></i> Filtrar
-                </button>
             </form>
             
             <!-- Tabla -->
+            <div id="pagos-table-container">
             <?php if (!empty($pagos)): ?>
                 <div class="table-container">
                     <table class="table">
@@ -130,6 +133,7 @@ function listarPagos() {
                                 <th>Monto</th>
                                 <th>Vencimiento</th>
                                 <th>Estado</th>
+                                <th>Método</th>
                                 <th>Fecha Pago</th>
                                 <th>Acciones</th>
                             </tr>
@@ -148,6 +152,7 @@ function listarPagos() {
                                             <?php echo textoEstadoPago($pago['estado']); ?>
                                         </span>
                                     </td>
+                                    <td><?php echo $pago['metodo_pago'] ? ucfirst($pago['metodo_pago']) : '-'; ?></td>
                                     <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
                                     <td class="actions">
                                         <?php if ($pago['estado'] !== 'pagado'): ?>
@@ -191,6 +196,7 @@ function listarPagos() {
                     <p>Intenta con otros filtros o registra un nuevo pago</p>
                 </div>
             <?php endif; ?>
+            </div>
         </div>
     </div>
     
@@ -244,7 +250,187 @@ function listarPagos() {
     
     <?php
     $contenido = ob_get_clean();
+    
+    // JS extra para el Live Search de pagos
+    $js_extra = [];
+    ob_start();
+    ?>
+    <script>
+    (function() {
+        const busquedaInput = document.getElementById('busqueda-input');
+        const estadoSelect = document.getElementById('estado-select');
+        const mesSelect = document.getElementById('mes-select');
+        const anioSelect = document.getElementById('anio-select');
+        const currentPageInput = document.getElementById('current-page');
+        const container = document.getElementById('pagos-table-container');
+        const baseUrl = document.getElementById('base-url').value;
+        let searchTimeout;
+        
+        function cargarPagos(pagina = 1) {
+            const busqueda = encodeURIComponent(busquedaInput.value);
+            const estado = encodeURIComponent(estadoSelect.value);
+            const mes = encodeURIComponent(mesSelect.value);
+            const anio = encodeURIComponent(anioSelect.value);
+            
+            const url = `${baseUrl}/controllers/pago_controller.php?accion=listar_ajax&pagina=${pagina}&busqueda=${busqueda}&estado=${estado}&mes=${mes}&anio=${anio}`;
+            
+            container.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+            
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    container.innerHTML = html;
+                    currentPageInput.value = pagina;
+                })
+                .catch(error => {
+                    container.innerHTML = '<div class="alert alert-danger">Error al cargar los datos</div>';
+                });
+        }
+        
+        // Live search con debounce
+        busquedaInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                cargarPagos(1);
+            }, 400);
+        });
+        
+        // Filtrar por estado, mes y anio
+        estadoSelect.addEventListener('change', () => cargarPagos(1));
+        mesSelect.addEventListener('change', () => cargarPagos(1));
+        anioSelect.addEventListener('change', () => cargarPagos(1));
+        
+        // Paginación AJAX
+        container.addEventListener('click', function(e) {
+            const paginationLink = e.target.closest('.pagination a');
+            if (paginationLink) {
+                e.preventDefault();
+                const url = new URL(paginationLink.href);
+                const pagina = url.searchParams.get('pagina');
+                if (pagina) {
+                    cargarPagos(parseInt(pagina));
+                }
+            }
+        });
+    })();
+    </script>
+    <?php
+    $js_adicional = ob_get_clean();
+    $contenido .= $js_adicional;
+    
     vista('partials/admin-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
+}
+
+function listarPagosAjax() {
+    global $modelo_pago;
+    
+    $pagina = intval($_GET['pagina'] ?? 1);
+    $estado = sanear($_GET['estado'] ?? '');
+    $mes = intval($_GET['mes'] ?? 0);
+    $anio = intval($_GET['anio'] ?? 0);
+    $busqueda = sanear($_GET['busqueda'] ?? '');
+    
+    $filtros = [];
+    if ($estado) $filtros['estado'] = $estado;
+    if ($mes) $filtros['mes'] = $mes;
+    if ($anio) $filtros['anio'] = $anio;
+    if ($busqueda) $filtros['busqueda'] = $busqueda;
+    
+    $resultado = $modelo_pago->obtenerConFiltros($filtros, $pagina, 15);
+    $pagos = $resultado['datos'];
+    $paginacion = $resultado['paginacion'];
+    
+    // Obtener clientes para renderizar
+    $modelo_cliente = new Cliente();
+    $clientes = $modelo_cliente->obtenerActivos();
+    
+    if (empty($pagos)) {
+        echo '<div class="empty-state">
+                <i class="fas fa-money-bill-wave"></i>
+                <h3>No se encontraron pagos</h3>
+                <p>Intenta con otros filtros o registra un nuevo pago</p>
+              </div>';
+        exit;
+    }
+    
+    ob_start();
+    ?>
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Lote</th>
+                    <th>Mes/Año</th>
+                    <th>Monto</th>
+                    <th>Vencimiento</th>
+                    <th>Estado</th>
+                    <th>Método</th>
+                    <th>Fecha Pago</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($pagos as $pago): ?>
+                    <tr>
+                        <td><?php echo $pago['id']; ?></td>
+                        <td><?php echo $pago['cliente_nombre']; ?></td>
+                        <td><?php echo $pago['numero_lote']; ?></td>
+                        <td><?php echo nombreMes($pago['mes']) . ' ' . $pago['anio']; ?></td>
+                        <td>S/ <?php echo formatearMoneda($pago['monto']); ?></td>
+                        <td><?php echo formatearFecha($pago['fecha_vencimiento']); ?></td>
+                        <td>
+                            <span class="badge <?php 
+                                echo $pago['estado'] === 'pagado' ? 'badge-success' : 
+                                    ($pago['estado'] === 'vencido' ? 'badge-danger' : 'badge-warning'); 
+                            ?>">
+                                <?php echo ucfirst($pago['estado']); ?>
+                            </span>
+                        </td>
+                        <td><?php echo $pago['metodo_pago'] ? ucfirst($pago['metodo_pago']) : '-'; ?></td>
+                        <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                        <td class="actions">
+                            <?php if ($pago['estado'] !== 'pagado'): ?>
+                                <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=marcar_pagado&id=<?php echo $pago['id']; ?>" 
+                                   class="btn btn-sm btn-success" title="Marcar como pagado">
+                                    <i class="fas fa-check"></i>
+                                </a>
+                            <?php endif; ?>
+                            <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=editar&id=<?php echo $pago['id']; ?>" 
+                               class="btn btn-sm btn-outline" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=eliminar&id=<?php echo $pago['id']; ?>" 
+                               class="btn btn-sm btn-danger remove-form" title="Eliminar"
+                               onclick="return confirm('¿Está seguro de eliminar este pago?');">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    <?php if ($paginacion['total_paginas'] > 1): ?>
+        <div class="pagination">
+            <?php if ($paginacion['tiene_anterior']): ?>
+                <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=listar_ajax&pagina=<?php echo $paginacion['pagina_actual'] - 1; ?>&estado=<?php echo urlencode($estado); ?>&mes=<?php echo $mes; ?>&anio=<?php echo $anio; ?>&busqueda=<?php echo urlencode($busqueda); ?>">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </a>
+            <?php endif; ?>
+            <span class="active"><?php echo $paginacion['pagina_actual']; ?></span>
+            <?php if ($paginacion['tiene_siguiente']): ?>
+                <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=listar_ajax&pagina=<?php echo $paginacion['pagina_actual'] + 1; ?>&estado=<?php echo urlencode($estado); ?>&mes=<?php echo $mes; ?>&anio=<?php echo $anio; ?>&busqueda=<?php echo urlencode($busqueda); ?>">
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </a>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+    <?php
+    exit;
 }
 
 function registrarPago() {
@@ -629,6 +815,7 @@ function editarPago() {
 
 function eliminarPago() {
     $id = intval($_GET['id'] ?? 0);
+    $modelo_pago = new Pago();
     
     if ($modelo_pago->eliminar($id)) {
         $db = Database::getInstance()->getConnection();

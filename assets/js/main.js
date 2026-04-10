@@ -297,8 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
         printBtn.addEventListener('click', function() {
             window.print();
         });
-    });
-    
+    }
+
     // ============================================
     // FILTROS AVANZADOS
     // ============================================

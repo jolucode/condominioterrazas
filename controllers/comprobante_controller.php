@@ -141,6 +141,7 @@ function listarComprobantes() {
 }
 
 function emitirComprobante() {
+    global $modelo_comprobante;
     $pago_id = intval($_GET['pago_id'] ?? 0);
     
     $modelo_pago = new Pago();
@@ -316,6 +317,7 @@ function emitirComprobante() {
 }
 
 function verComprobante() {
+    global $modelo_comprobante;
     $id = intval($_GET['id'] ?? 0);
     $comprobante = $modelo_comprobante->obtenerParaImpresion($id);
     
@@ -418,6 +420,7 @@ function verComprobante() {
 }
 
 function anularComprobante() {
+    global $modelo_comprobante;
     $id = intval($_GET['id'] ?? 0);
     
     if ($modelo_comprobante->anularComprobante($id)) {
@@ -437,6 +440,7 @@ function anularComprobante() {
 }
 
 function imprimirComprobante() {
+    global $modelo_comprobante;
     $id = intval($_GET['id'] ?? 0);
     $comprobante = $modelo_comprobante->obtenerParaImpresion($id);
     
