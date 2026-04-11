@@ -118,7 +118,7 @@ class Cliente extends ModeloBase {
      */
     public function generarPagosMensuales($mes, $anio, $monto) {
         $clientes = $this->obtenerActivos();
-        $fecha_vencimiento = date('Y-m-d', strtotime("{$anio}-{$mes}-10"));
+        $fecha_vencimiento = date('Y-m-d', strtotime("{$anio}-{$mes}-27"));
         $creados = 0;
         
         foreach ($clientes as $cliente) {
