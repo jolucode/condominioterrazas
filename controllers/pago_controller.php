@@ -44,8 +44,8 @@ function listarPagos() {
     $pagina = intval($_GET['pagina'] ?? 1);
     $cliente_id = intval($_GET['cliente_id'] ?? 0);
     $estado = sanear($_GET['estado'] ?? '');
-    $mes = intval($_GET['mes'] ?? 0);
-    $anio = intval($_GET['anio'] ?? date('Y'));
+    $mes = isset($_GET['mes']) ? intval($_GET['mes']) : date('n');
+    $anio = isset($_GET['anio']) ? intval($_GET['anio']) : date('Y');
     $busqueda = sanear($_GET['busqueda'] ?? '');
     
     $filtros = [];
@@ -107,7 +107,7 @@ function listarPagos() {
                     <option value="vencido" <?php echo $estado === 'vencido' ? 'selected' : ''; ?>>Vencidos</option>
                 </select>
                 <select id="mes-select" class="form-control">
-                    <option value="">Todos los meses</option>
+                    <option value="0">Todos los meses</option>
                     <?php for ($m = 1; $m <= 12; $m++): ?>
                         <option value="<?php echo $m; ?>" <?php echo $mes === $m ? 'selected' : ''; ?>><?php echo nombreMes($m); ?></option>
                     <?php endfor; ?>
@@ -326,8 +326,8 @@ function listarPagosAjax() {
     
     $pagina = intval($_GET['pagina'] ?? 1);
     $estado = sanear($_GET['estado'] ?? '');
-    $mes = intval($_GET['mes'] ?? 0);
-    $anio = intval($_GET['anio'] ?? 0);
+    $mes = isset($_GET['mes']) ? intval($_GET['mes']) : date('n');
+    $anio = isset($_GET['anio']) ? intval($_GET['anio']) : date('Y');
     $busqueda = sanear($_GET['busqueda'] ?? '');
     
     $filtros = [];

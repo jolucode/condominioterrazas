@@ -512,22 +512,23 @@ a:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #fee2e2;
-    color: #ef4444;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radio-sm);
+    background: var(--color-peligro-claro);
+    color: var(--color-peligro);
     border: none;
     cursor: pointer;
     transition: var(--transicion);
     padding: 0;
     flex-shrink: 0;
+    font-size: 0.75rem;
 }
 
 .btn-icon-danger:hover {
-    background: #ef4444;
+    background: var(--color-peligro);
     color: var(--color-blanco);
-    transform: scale(1.1);
+    transform: translateY(-1px);
 }
 
 .btn-block {
