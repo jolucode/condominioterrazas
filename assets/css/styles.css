@@ -33,6 +33,37 @@
     --transicion: all 0.2s ease;
 }
 
+[data-theme="dark"] {
+    --color-fondo: #0f172a;
+    --color-blanco: #1e293b;
+    --color-texto: #f8fafc;
+    --color-texto-claro: #94a3b8;
+    --color-borde: #334155;
+    
+    --color-primario-claro: rgba(37, 99, 235, 0.2);
+    --color-exito-claro: rgba(16, 185, 129, 0.2);
+    --color-peligro-claro: rgba(239, 68, 68, 0.2);
+    --color-advertencia-claro: rgba(245, 158, 11, 0.2);
+    --color-info-claro: rgba(6, 182, 212, 0.2);
+    --sombra-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --sombra: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+}
+
+/* Extra dark mode adjustments */
+[data-theme="dark"] .table tbody tr:hover {
+    background: #334155;
+}
+
+[data-theme="dark"] input.form-control, [data-theme="dark"] select.form-control, [data-theme="dark"] textarea.form-control {
+    background-color: var(--color-fondo);
+    color: var(--color-texto);
+}
+
+[data-theme="dark"] .badge-secondary {
+    background: #334155;
+    color: #e2e8f0;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -475,6 +506,28 @@ a:hover {
 .btn-lg {
     padding: 0.75rem 1.5rem;
     font-size: 1rem;
+}
+
+.btn-icon-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #fee2e2;
+    color: #ef4444;
+    border: none;
+    cursor: pointer;
+    transition: var(--transicion);
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.btn-icon-danger:hover {
+    background: #ef4444;
+    color: var(--color-blanco);
+    transform: scale(1.1);
 }
 
 .btn-block {

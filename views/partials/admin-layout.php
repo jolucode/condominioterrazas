@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($titulo) ? $titulo . ' - ' : ''; ?><?php echo APP_NAME; ?></title>
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/styles.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/styles.css?v=2.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <?php if (isset($css_extra)): ?>
         <?php foreach ($css_extra as $css): ?>
@@ -38,6 +38,9 @@
                     </div>
                 </div>
                 <div class="topbar-right">
+                    <button class="btn btn-outline btn-sm" id="theme-toggle" aria-label="Cambiar Tema Oscuro/Claro" style="padding: 0.5rem 0.6rem; border-radius: 50%; border: none; font-size: 1.1rem;" title="Tema Oscuro">
+                        <i class="fas fa-moon"></i>
+                    </button>
                     <a href="<?php echo APP_URL; ?>/controllers/auth_controller.php?accion=cerrar" class="btn btn-outline btn-sm">
                         <i class="fas fa-sign-out-alt"></i> Salir
                     </a>
@@ -64,7 +67,7 @@
         </div>
     </div>
     
-    <script src="<?php echo APP_URL; ?>/assets/js/main.js?v=2"></script>
+    <script src="<?php echo APP_URL; ?>/assets/js/main.js?v=3"></script>
     <?php if (isset($js_extra)): ?>
         <?php foreach ($js_extra as $js): ?>
             <script src="<?php echo APP_URL . $js; ?>"></script>

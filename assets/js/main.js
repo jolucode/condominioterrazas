@@ -405,6 +405,59 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // ============================================
+    // DARK MODE TOGGLE
+    // ============================================
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+    // Función para cambiar el ícono según el tema
+    function updateThemeIcon(theme) {
+        if (!themeToggleBtn) return;
+        const icon = themeToggleBtn.querySelector('i');
+        if (theme === 'dark') {
+            icon.classList.remove('fa-moon');
+            icon.classList.add('fa-sun');
+            themeToggleBtn.title = 'Tema Claro';
+        } else {
+            icon.classList.remove('fa-sun');
+            icon.classList.add('fa-moon');
+            themeToggleBtn.title = 'Tema Oscuro';
+        }
+    }
+
+    // Comprobar la preferencia guardada o asignarla
+    const currentTheme = localStorage.getItem("theme");
+    if (currentTheme == "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+        updateThemeIcon('dark');
+    } else if (currentTheme == "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+        updateThemeIcon('light');
+    } else if (prefersDarkScheme.matches) {
+        // Fallback al tema del sistema
+        document.documentElement.setAttribute("data-theme", "dark");
+        updateThemeIcon('dark');
+    }
+
+    // Escuchar el clic del botón
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener("click", function() {
+            let theme = document.documentElement.getAttribute("data-theme");
+            let targetTheme = "light";
+
+            if (theme === "dark") {
+                targetTheme = "light";
+            } else {
+                targetTheme = "dark";
+            }
+
+            document.documentElement.setAttribute("data-theme", targetTheme);
+            localStorage.setItem("theme", targetTheme);
+            updateThemeIcon(targetTheme);
+        });
+    }
+
 });
 
 // ============================================

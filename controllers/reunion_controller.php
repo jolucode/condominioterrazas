@@ -272,7 +272,7 @@ function crearReunion() {
                                                placeholder="Responsable"
                                                value="<?php echo isset($acuerdo['responsable']) ? $acuerdo['responsable'] : ''; ?>">
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-danger remove-acuerdo" style="align-self: center;">
+                                    <button type="button" class="btn-icon-danger remove-acuerdo" style="align-self: center;" title="Eliminar">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
@@ -296,7 +296,7 @@ function crearReunion() {
                             <div class="form-group" style="flex: 1;">
                                 <input type="text" name="acuerdos[__INDEX__][responsable]" class="form-control" placeholder="Responsable">
                             </div>
-                            <button type="button" class="btn btn-sm btn-danger remove-acuerdo" style="align-self: center;">
+                            <button type="button" class="btn-icon-danger remove-acuerdo" style="align-self: center;" title="Eliminar">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
@@ -432,7 +432,7 @@ function editarReunion() {
                                             <input type="text" name="acuerdos[<?php echo $index; ?>][responsable]" class="form-control" 
                                                    value="<?php echo $acuerdo['responsable'] ?: ''; ?>">
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-danger remove-acuerdo" style="align-self: center;">
+                                        <button type="button" class="btn-icon-danger remove-acuerdo" style="align-self: center;" title="Eliminar">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
@@ -454,7 +454,7 @@ function editarReunion() {
                             <div class="form-group" style="flex: 1;">
                                 <input type="text" name="acuerdos[__INDEX__][responsable]" class="form-control" placeholder="Responsable">
                             </div>
-                            <button type="button" class="btn btn-sm btn-danger remove-acuerdo" style="align-self: center;">
+                            <button type="button" class="btn-icon-danger remove-acuerdo" style="align-self: center;" title="Eliminar">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
