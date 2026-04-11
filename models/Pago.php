@@ -148,12 +148,12 @@ class Pago extends ModeloBase {
     public function estadisticas($mes = null, $anio = null) {
         $sql = "SELECT 
                     COUNT(*) as total,
-                    SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END) as pagados,
-                    SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-                    SUM(CASE WHEN estado = 'vencido' THEN 1 ELSE 0 END) as vencidos,
-                    SUM(CASE WHEN estado = 'pagado' THEN monto ELSE 0 END) as total_recaudado,
-                    SUM(CASE WHEN estado = 'pendiente' THEN monto ELSE 0 END) as total_pendiente,
-                    SUM(CASE WHEN estado = 'vencido' THEN monto ELSE 0 END) as total_vencido
+                    COALESCE(SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END), 0) as pagados,
+                    COALESCE(SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END), 0) as pendientes,
+                    COALESCE(SUM(CASE WHEN estado = 'vencido' THEN 1 ELSE 0 END), 0) as vencidos,
+                    COALESCE(SUM(CASE WHEN estado = 'pagado' THEN monto ELSE 0 END), 0) as total_recaudado,
+                    COALESCE(SUM(CASE WHEN estado = 'pendiente' THEN monto ELSE 0 END), 0) as total_pendiente,
+                    COALESCE(SUM(CASE WHEN estado = 'vencido' THEN monto ELSE 0 END), 0) as total_vencido
                 FROM {$this->tabla}
                 WHERE 1=1";
         

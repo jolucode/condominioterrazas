@@ -68,7 +68,7 @@ function formatearFecha($fecha, $formato = 'd/m/Y') {
 
 // Formatear moneda
 function formatearMoneda($monto) {
-    return MONEDA . ' ' . number_format($monto, 2);
+    return MONEDA . ' ' . number_format((float)($monto ?? 0), 2);
 }
 
 // Obtener nombre del mes
