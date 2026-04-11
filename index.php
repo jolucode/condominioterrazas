@@ -46,6 +46,7 @@ for ($i = 1; $i <= 12; $i++) {
         'mes' => nombreMes($i),
         'pagados' => 0,
         'pendientes' => 0,
+        'vencidos' => 0,
         'recaudado' => 0
     ];
 }
@@ -54,7 +55,8 @@ foreach ($pagos_por_mes as $pago_mes) {
     $datos_grafico_meses[$pago_mes['mes']] = [
         'mes' => nombreMes($pago_mes['mes']),
         'pagados' => intval($pago_mes['pagados']),
-        'pendientes' => intval($pago_mes['total']) - intval($pago_mes['pagados']),
+        'pendientes' => intval($pago_mes['pendientes']),
+        'vencidos' => intval($pago_mes['vencidos']),
         'recaudado' => floatval($pago_mes['total_recaudado'])
     ];
 }
@@ -159,18 +161,22 @@ ob_start();
             <?php if (!empty($datos_grafico_meses)): ?>
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <?php foreach ($datos_grafico_meses as $datos): ?>
-                        <?php if ($datos['pagados'] > 0 || $datos['pendientes'] > 0): ?>
+                        <?php if ($datos['pagados'] > 0 || $datos['pendientes'] > 0 || $datos['vencidos'] > 0): ?>
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <div style="min-width: 80px; font-size: 0.8rem; color: var(--color-texto-claro);"><?php echo $datos['mes']; ?></div>
                                 <div style="flex: 1; background: var(--color-fondo); border-radius: 0.25rem; height: 24px; overflow: hidden; display: flex;">
                                     <?php 
-                                    $total = $datos['pagados'] + $datos['pendientes'];
+                                    $total = $datos['pagados'] + $datos['pendientes'] + $datos['vencidos'];
                                     $porcentaje_pagados = $total > 0 ? ($datos['pagados'] / $total) * 100 : 0;
+                                    $porcentaje_pendientes = $total > 0 ? ($datos['pendientes'] / $total) * 100 : 0;
+                                    $porcentaje_vencidos = $total > 0 ? ($datos['vencidos'] / $total) * 100 : 0;
                                     ?>
                                     <div style="width: <?php echo $porcentaje_pagados; ?>%; background: var(--color-exito); height: 100%;" 
                                          title="Pagados: <?php echo $datos['pagados']; ?>"></div>
-                                    <div style="width: <?php echo 100 - $porcentaje_pagados; ?>%; background: var(--color-advertencia); height: 100%;"
+                                    <div style="width: <?php echo $porcentaje_pendientes; ?>%; background: var(--color-advertencia); height: 100%;"
                                          title="Pendientes: <?php echo $datos['pendientes']; ?>"></div>
+                                    <div style="width: <?php echo $porcentaje_vencidos; ?>%; background: var(--color-peligro); height: 100%;"
+                                         title="Vencidos: <?php echo $datos['vencidos']; ?>"></div>
                                 </div>
                                 <div style="min-width: 40px; font-size: 0.75rem; text-align: right;">
                                     <span style="color: var(--color-exito);"><?php echo $datos['pagados']; ?></span>/<?php echo $total; ?>
@@ -179,9 +185,10 @@ ob_start();
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
-                <div style="margin-top: 1rem; display: flex; gap: 1.5rem; font-size: 0.8rem;">
+                <div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.8rem;">
                     <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--color-exito); border-radius: 2px; margin-right: 0.25rem;"></span> Pagados</span>
                     <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--color-advertencia); border-radius: 2px; margin-right: 0.25rem;"></span> Pendientes</span>
+                    <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--color-peligro); border-radius: 2px; margin-right: 0.25rem;"></span> Vencidos</span>
                 </div>
             <?php else: ?>
                 <div class="empty-state">

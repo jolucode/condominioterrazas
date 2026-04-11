@@ -182,7 +182,8 @@ class Pago extends ModeloBase {
                     mes,
                     COUNT(*) as total,
                     SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END) as pagados,
-                    SUM(CASE WHEN estado = 'pendiente' OR estado = 'vencido' THEN 1 ELSE 0 END) as pendientes,
+                    SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
+                    SUM(CASE WHEN estado = 'vencido' THEN 1 ELSE 0 END) as vencidos,
                     SUM(CASE WHEN estado = 'pagado' THEN monto ELSE 0 END) as total_recaudado
                 FROM {$this->tabla}
                 WHERE anio = :anio
