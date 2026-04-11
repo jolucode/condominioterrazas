@@ -156,6 +156,15 @@ function listarPagos() {
                                     <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
                                     <td class="actions">
                                         <?php if ($pago['estado'] !== 'pagado'): ?>
+                                            <?php 
+                                            $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te recordamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* vence el *" . formatearFecha($pago['fecha_vencimiento']) . "*. Monto: *" . formatearMoneda($pago['monto']) . "*. Evita recargos pagando a tiempo. ¡Muchas gracias!";
+                                            $url_wa = "https://api.whatsapp.com/send?phone=51" . preg_replace('/[^0-9]/', '', $pago['telefono'] ?? '') . "&text=" . urlencode($mensaje_wa);
+                                            ?>
+                                            <?php if (!empty($pago['telefono'])): ?>
+                                            <a href="<?php echo $url_wa; ?>" class="btn btn-sm btn-whatsapp" target="_blank" title="Enviar aviso WhatsApp">
+                                                <i class="fab fa-whatsapp"></i>
+                                            </a>
+                                            <?php endif; ?>
                                             <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=marcar_pagado&id=<?php echo $pago['id']; ?>" 
                                                class="btn btn-sm btn-success" title="Marcar como pagado">
                                                 <i class="fas fa-check"></i>
@@ -378,7 +387,7 @@ function listarPagosAjax() {
                         <td><?php echo $pago['cliente_nombre']; ?></td>
                         <td><?php echo $pago['numero_lote']; ?></td>
                         <td><?php echo nombreMes($pago['mes']) . ' ' . $pago['anio']; ?></td>
-                        <td>S/ <?php echo formatearMoneda($pago['monto']); ?></td>
+                        <td><?php echo formatearMoneda($pago['monto']); ?></td>
                         <td><?php echo formatearFecha($pago['fecha_vencimiento']); ?></td>
                         <td>
                             <span class="badge <?php 
@@ -392,6 +401,15 @@ function listarPagosAjax() {
                         <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
                         <td class="actions">
                             <?php if ($pago['estado'] !== 'pagado'): ?>
+                                <?php 
+                                $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te recordamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* vence el *" . formatearFecha($pago['fecha_vencimiento']) . "*. Monto: *" . formatearMoneda($pago['monto']) . "*. Evita recargos pagando a tiempo. ¡Muchas gracias!";
+                                $url_wa = "https://api.whatsapp.com/send?phone=51" . preg_replace('/[^0-9]/', '', $pago['telefono'] ?? '') . "&text=" . urlencode($mensaje_wa);
+                                ?>
+                                <?php if (!empty($pago['telefono'])): ?>
+                                <a href="<?php echo $url_wa; ?>" class="btn btn-sm btn-whatsapp" target="_blank" title="Enviar aviso WhatsApp">
+                                    <i class="fab fa-whatsapp"></i>
+                                </a>
+                                <?php endif; ?>
                                 <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=marcar_pagado&id=<?php echo $pago['id']; ?>" 
                                    class="btn btn-sm btn-success" title="Marcar como pagado">
                                     <i class="fas fa-check"></i>

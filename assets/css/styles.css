@@ -531,6 +531,18 @@ a:hover {
     transform: translateY(-1px);
 }
 
+.btn-whatsapp {
+    background-color: #25D366;
+    color: #fff;
+    border: none;
+}
+
+.btn-whatsapp:hover {
+    background-color: #128C7E;
+    color: #fff;
+    transform: translateY(-1px);
+}
+
 .btn-block {
     width: 100%;
 }
