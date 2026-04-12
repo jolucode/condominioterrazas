@@ -37,6 +37,7 @@ require_once ROOT_PATH . '/models/Pago.php';
 require_once ROOT_PATH . '/models/Comprobante.php';
 require_once ROOT_PATH . '/models/Reunion.php';
 require_once ROOT_PATH . '/models/ArchivoAdjunto.php';
+require_once ROOT_PATH . '/models/Avance.php';
 
 // Función para incluir vistas
 function vista($nombre, $datos = []) {

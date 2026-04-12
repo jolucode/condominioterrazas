@@ -28,6 +28,10 @@
         
         <div class="nav-section">
             <div class="nav-section-title">Comunidad</div>
+            <a href="<?php echo APP_URL; ?>/controllers/avance_controller.php?accion=listar" class="nav-link <?php echo ($pagina_actual === 'avances') ? 'active' : ''; ?>">
+                <i class="fas fa-images"></i>
+                <span>Avances del Condominio</span>
+            </a>
             <a href="<?php echo APP_URL; ?>/controllers/cliente_panel.php?accion=reuniones" class="nav-link <?php echo ($pagina_actual === 'reuniones') ? 'active' : ''; ?>">
                 <i class="fas fa-handshake"></i>
                 <span>Reuniones y Acuerdos</span>
