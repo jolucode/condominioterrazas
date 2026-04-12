@@ -15,20 +15,31 @@ if (!defined('ROOT_PATH')) {
 }
 
 // ============================================
-// CONFIGURACIÓN DE LA BASE DE DATOS
+// CONFIGURACIÓN HÍBRIDA (LOCAL / PRODUCCIÓN)
 // ============================================
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'condominio_terrazas');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_CHARSET', 'utf8mb4');
+$is_local = in_array($_SERVER['REMOTE_ADDR'], ['127.0.0.1', '::1']) || $_SERVER['HTTP_HOST'] === 'localhost';
 
-// ============================================
-// CONFIGURACIÓN DE LA APLICACIÓN
-// ============================================
-define('APP_URL', 'http://localhost/condominioterrazas');
-define('APP_VERSION', '1.0.0');
-define('APP_ENV', 'development'); // development | production
+if ($is_local) {
+    // LOCAL (LARAGON)
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'condominio_terrazas');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('APP_URL', 'http://localhost/condominioterrazas');
+    define('APP_ENV', 'development');
+} else {
+    // PRODUCCIÓN (INFINITYFREE / OTROS)
+    // RELLENA ESTOS DATOS CON LO QUE TE DÉ INFINITYFREE:
+    define('DB_HOST', 'sql211.infinityfree.com'); // Ej: sql205.epizy.com
+    define('DB_NAME', 'if0_41640060_condterrazasdb'); 
+    define('DB_USER', 'if0_41640060 ');
+    define('DB_PASS', 'Fijoww1212 ');
+    define('APP_URL', 'http://condterrazas.free.nf/'); // O tu dominio real
+    define('APP_ENV', 'production');
+}
+
+define('DB_CHARSET', 'utf8mb4');
+define('APP_VERSION', '1.0.1');
 
 // ============================================
 // RUTAS DEL SISTEMA

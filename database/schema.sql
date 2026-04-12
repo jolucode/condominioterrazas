@@ -3,11 +3,11 @@
 -- Base de Datos MySQL
 -- ============================================
 
-CREATE DATABASE IF NOT EXISTS condominio_terrazas 
+CREATE DATABASE IF NOT EXISTS if0_41640060_condterrazasdb 
 CHARACTER SET utf8mb4 
 COLLATE utf8mb4_unicode_ci;
 
-USE condominio_terrazas;
+USE if0_41640060_condterrazasdb;
 
 -- ============================================
 -- TABLA: USUARIOS
@@ -216,37 +216,32 @@ INSERT INTO configuracion (clave, valor, descripcion) VALUES
 ('ruc_condominio', '', 'RUC del condominio'),
 ('direccion_fiscal', '', 'Dirección fiscal para facturación');
 
+-- Lógica de actualización de pagos vencidos (Se maneja via PHP en InfinityFree por compatibilidad)
 -- ============================================
--- PROCEDIMIENTO ALMACENADO: Actualizar estado de pagos
+-- TABLA: AVANCES DEL CONDOMINIO
 -- ============================================
-DELIMITER //
-CREATE PROCEDURE IF NOT EXISTS actualizar_pagos_vencidos()
-BEGIN
-    UPDATE pagos 
-    SET estado = 'vencido' 
-    WHERE estado = 'pendiente' 
-    AND fecha_vencimiento < CURDATE();
-END//
-DELIMITER ;
+CREATE TABLE IF NOT EXISTS avances (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT NOT NULL,
+    imagen_url VARCHAR(255) NULL, -- Referencia legacy
+    creado_por INT NOT NULL,
+    fecha_publicacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- VISTA: Resumen de pagos por cliente
+-- TABLA: AVANCE_IMAGENES (Galeria multiple)
 -- ============================================
-CREATE OR REPLACE VIEW vw_resumen_pagos_cliente AS
-SELECT 
-    c.id AS cliente_id,
-    CONCAT(c.nombres, ' ', c.apellidos) AS nombre_completo,
-    c.dni,
-    c.numero_lote,
-    c.estado AS cliente_estado,
-    COUNT(p.id) AS total_pagos,
-    SUM(CASE WHEN p.estado = 'pagado' THEN 1 ELSE 0 END) AS pagos_realizados,
-    SUM(CASE WHEN p.estado = 'pendiente' THEN 1 ELSE 0 END) AS pagos_pendientes,
-    SUM(CASE WHEN p.estado = 'vencido' THEN 1 ELSE 0 END) AS pagos_vencidos,
-    SUM(CASE WHEN p.estado = 'pagado' THEN p.monto ELSE 0 END) AS total_pagado
-FROM clientes c
-LEFT JOIN pagos p ON c.id = p.cliente_id
-GROUP BY c.id;
+CREATE TABLE IF NOT EXISTS avance_imagenes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    avance_id INT NOT NULL,
+    ruta_imagen VARCHAR(255) NOT NULL,
+    orden INT DEFAULT 0,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (avance_id) REFERENCES avances(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
 -- EVENTO: Actualizar pagos vencidos automáticamente

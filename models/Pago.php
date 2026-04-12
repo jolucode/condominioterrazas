@@ -130,9 +130,9 @@ class Pago extends ModeloBase {
     }
     
     /**
-     * Actualizar estados vencidos
+     * Actualizar estados vencidos (IMPORTANTE: InfinityFree no permite Stored Procedures)
      */
-    public function actualizarVencidos() {
+    public function actualizarEstadosVencidos() {
         $sql = "UPDATE {$this->tabla} 
                 SET estado = 'vencido' 
                 WHERE estado = 'pendiente' 
@@ -146,6 +146,9 @@ class Pago extends ModeloBase {
      * Estadísticas de pagos
      */
     public function estadisticas($mes = null, $anio = null) {
+        // Ejecutar actualización de vencidos automáticamente al consultar estadísticas
+        $this->actualizarEstadosVencidos();
+
         $sql = "SELECT 
                     COUNT(*) as total,
                     COALESCE(SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END), 0) as pagados,
