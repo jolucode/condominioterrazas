@@ -17,7 +17,8 @@ if (!defined('ROOT_PATH')) {
 // ============================================
 // CONFIGURACIÓN HÍBRIDA (LOCAL / PRODUCCIÓN)
 // ============================================
-$is_local = in_array($_SERVER['REMOTE_ADDR'], ['127.0.0.1', '::1']) || $_SERVER['HTTP_HOST'] === 'localhost';
+// Detectar automáticamente si estamos en Local o Nube
+$is_local = ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1' || strpos($_SERVER['HTTP_HOST'], '192.168.') !== false);
 
 if ($is_local) {
     // LOCAL (LARAGON)
@@ -29,12 +30,14 @@ if ($is_local) {
     define('APP_ENV', 'development');
 } else {
     // PRODUCCIÓN (INFINITYFREE / OTROS)
-    // RELLENA ESTOS DATOS CON LO QUE TE DÉ INFINITYFREE:
-    define('DB_HOST', 'sql211.infinityfree.com'); // Ej: sql205.epizy.com
+    define('DB_HOST', 'sql211.infinityfree.com');
     define('DB_NAME', 'if0_41640060_condterrazasdb'); 
-    define('DB_USER', 'if0_41640060 ');
-    define('DB_PASS', 'Fijoww1212 ');
-    define('APP_URL', 'http://condterrazas.free.nf/'); // O tu dominio real
+    define('DB_USER', 'if0_41640060');
+    define('DB_PASS', 'Fijoww1212');
+    
+    // Auto-detectar URL en producción para evitar errores de escritura
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+    define('APP_URL', $protocol . $_SERVER['HTTP_HOST']); 
     define('APP_ENV', 'production');
 }
 
@@ -94,6 +97,7 @@ if (APP_ENV === 'development') {
     error_reporting(E_ALL);
     ini_set('display_errors', 1);
 } else {
+    // En producción, silenciamos errores pero los registramos si es posible
     error_reporting(0);
     ini_set('display_errors', 0);
 }
