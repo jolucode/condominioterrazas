@@ -56,7 +56,7 @@ function listarPagos() {
     if ($busqueda) $filtros['busqueda'] = $busqueda;
     
     // Actualizar pagos vencidos
-    $modelo_pago->actualizarVencidos();
+    $modelo_pago->actualizarEstadosVencidos();
     
     $resultado = $modelo_pago->obtenerConFiltros($filtros, $pagina, 15);
     $pagos = $resultado['datos'];
