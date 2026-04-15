@@ -58,6 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <div class="login-container">
+        <div class="login-bg" aria-hidden="true">
+            <div class="slide" style="background-image: url('<?php echo APP_URL; ?>/uploads/condominio/pisicnaprincipal.jpeg');"></div>
+            <div class="slide" style="background-image: url('<?php echo APP_URL; ?>/uploads/condominio/portico.jpeg');"></div>
+        </div>
         <div class="login-card">
             <div class="login-header">
                 <div class="logo">
