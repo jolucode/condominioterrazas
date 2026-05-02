@@ -364,6 +364,10 @@ function crearCliente() {
     $errores = [];
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/cliente_controller.php?accion=crear');
+        }
         $nombres = sanear($_POST['nombres'] ?? '');
         $apellidos = sanear($_POST['apellidos'] ?? '');
         $dni = sanear($_POST['dni'] ?? '');
@@ -467,10 +471,11 @@ function crearCliente() {
             <?php endif; ?>
             
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Nombres <span class="required">*</span></label>
-                        <input type="text" name="nombres" class="form-control" required 
+                        <input type="text" name="nombres" class="form-control" required
                                value="<?php echo isset($_POST['nombres']) ? $_POST['nombres'] : ''; ?>">
                     </div>
                     <div class="form-group">
@@ -592,6 +597,10 @@ function editarCliente() {
     $errores = [];
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/cliente_controller.php?accion=editar&id=' . $id);
+        }
         $nombres = sanear($_POST['nombres'] ?? '');
         $apellidos = sanear($_POST['apellidos'] ?? '');
         $dni = sanear($_POST['dni'] ?? '');
@@ -603,7 +612,7 @@ function editarCliente() {
         $manzana = sanear($_POST['manzana'] ?? '');
         $etapa = sanear($_POST['etapa'] ?? '');
         $estado = sanear($_POST['estado'] ?? 'activo');
-        
+
         // Validaciones
         if (empty($nombres)) $errores[] = 'El nombre es requerido';
         if (empty($apellidos)) $errores[] = 'El apellido es requerido';
@@ -665,10 +674,11 @@ function editarCliente() {
             <?php endif; ?>
             
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Nombres <span class="required">*</span></label>
-                        <input type="text" name="nombres" class="form-control" required 
+                        <input type="text" name="nombres" class="form-control" required
                                value="<?php echo $cliente['nombres']; ?>">
                     </div>
                     <div class="form-group">

@@ -9,6 +9,7 @@
             </div>
             <div class="card-body">
                 <form action="avance_controller.php?accion=crear" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                     <div class="form-group" style="margin-bottom: 1.5rem;">
                         <label for="titulo" class="form-label">Título del Avance</label>
                         <input type="text" id="titulo" name="titulo" class="form-control" placeholder="Ej: Renovación de fachada norte" required>

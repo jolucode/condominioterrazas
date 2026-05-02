@@ -148,6 +148,10 @@ function crearReunion() {
     $errores = [];
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/reunion_controller.php?accion=crear');
+        }
         $titulo = sanear($_POST['titulo'] ?? '');
         $descripcion = sanear($_POST['descripcion'] ?? '');
         $fecha_reunion = sanear($_POST['fecha_reunion'] ?? '');
@@ -156,7 +160,7 @@ function crearReunion() {
         $proxima_fecha = sanear($_POST['proxima_fecha'] ?? '');
         $estado = sanear($_POST['estado'] ?? 'borrador');
         $acuerdos = $_POST['acuerdos'] ?? [];
-        
+
         if (empty($titulo)) $errores[] = 'El título es requerido';
         if (empty($descripcion)) $errores[] = 'La descripción es requerida';
         if (empty($fecha_reunion)) $errores[] = 'La fecha de reunión es requerida';
@@ -217,9 +221,10 @@ function crearReunion() {
             <?php endif; ?>
             
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Título <span class="required">*</span></label>
-                    <input type="text" name="titulo" class="form-control" required 
+                    <input type="text" name="titulo" class="form-control" required
                            value="<?php echo isset($_POST['titulo']) ? $_POST['titulo'] : ''; ?>">
                 </div>
                 
@@ -331,6 +336,10 @@ function editarReunion() {
     }
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/reunion_controller.php?accion=editar&id=' . $id);
+        }
         $titulo = sanear($_POST['titulo'] ?? '');
         $descripcion = sanear($_POST['descripcion'] ?? '');
         $fecha_reunion = sanear($_POST['fecha_reunion'] ?? '');
@@ -339,7 +348,7 @@ function editarReunion() {
         $proxima_fecha = sanear($_POST['proxima_fecha'] ?? '');
         $estado = sanear($_POST['estado'] ?? 'borrador');
         $acuerdos = $_POST['acuerdos'] ?? [];
-        
+
         $acuerdos = array_filter($acuerdos, function($a) {
             return !empty($a['descripcion']);
         });
@@ -378,6 +387,7 @@ function editarReunion() {
         </div>
         <div class="card-body">
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Título <span class="required">*</span></label>
                     <input type="text" name="titulo" class="form-control" required value="<?php echo $reunion['titulo']; ?>">

@@ -56,6 +56,10 @@ function crearAvance() {
     global $modelo_avance;
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/avance_controller.php?accion=crear');
+        }
         $titulo_post = sanear($_POST['titulo']);
         $descripcion = sanear($_POST['descripcion']);
         $creado_por = $_SESSION['usuario_id'];
@@ -112,13 +116,15 @@ function crearAvance() {
  */
 function eliminarAvance() {
     global $modelo_avance;
-    $id = intval($_GET['id']);
-    
-    $avance = $modelo_avance->obtenerTodos(); // Esto es ineficiente pero sirve para buscar el ID
-    // Mejor obtenerPorId personalizado que incluya imágenes
-    $sql_imgs = "SELECT * FROM avance_imagenes WHERE avance_id = :id";
+    $id = intval($_GET['id'] ?? 0);
+
+    if (!$id || !$modelo_avance->obtenerPorId($id)) {
+        setFlashMessage('error', 'Avance no encontrado.');
+        redirigir('controllers/avance_controller.php?accion=listar');
+    }
+
     $db = Database::getInstance()->getConnection();
-    $stmt = $db->prepare($sql_imgs);
+    $stmt = $db->prepare("SELECT * FROM avance_imagenes WHERE avance_id = :id");
     $stmt->execute([':id' => $id]);
     $imagenes = $stmt->fetchAll();
 
@@ -128,7 +134,7 @@ function eliminarAvance() {
             @unlink($archivo);
         }
     }
-    
+
     $modelo_avance->eliminar($id);
     setFlashMessage('success', 'Avance eliminado correctamente.');
     redirigir('controllers/avance_controller.php?accion=listar');

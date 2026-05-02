@@ -221,6 +221,7 @@ function listarPagos() {
                 <button class="modal-close">&times;</button>
             </div>
             <form method="POST" action="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=generar_pagos" data-confirm="¿Está seguro de generar los pagos para todos los clientes activos?">
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="modal-body">
                     <div class="form-row">
                         <div class="form-group">
@@ -465,6 +466,10 @@ function registrarPago() {
     $errores = [];
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/pago_controller.php?accion=registrar');
+        }
         $cliente_id = intval($_POST['cliente_id'] ?? 0);
         $mes = intval($_POST['mes'] ?? 0);
         $anio = intval($_POST['anio'] ?? date('Y'));
@@ -487,7 +492,7 @@ function registrarPago() {
         }
         
         if (empty($errores)) {
-            $fecha_vencimiento = $fecha_vencimiento ?: date('Y-' . str_pad($mes, 2, '0', STR_PAD_LEFT) . '-10');
+            $fecha_vencimiento = $fecha_vencimiento ?: date('Y-m-t', mktime(0, 0, 0, $mes, 1, $anio));
             $estado = 'pendiente';
             
             $datos = [
@@ -548,6 +553,7 @@ function registrarPago() {
             <?php endif; ?>
             
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Cliente <span class="required">*</span></label>
                     <select name="cliente_id" class="form-control" required>
@@ -648,6 +654,10 @@ function marcarPagado() {
     
     // Si es POST, procesar
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/pago_controller.php?accion=marcar_pagado&id=' . $id);
+        }
         $metodo_pago = sanear($_POST['metodo_pago'] ?? '');
         $observacion = sanear($_POST['observacion'] ?? '');
         
@@ -696,6 +706,7 @@ function marcarPagado() {
             </div>
             
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Método de Pago <span class="required">*</span></label>
                     <select name="metodo_pago" class="form-control" required>
@@ -742,6 +753,10 @@ function editarPago() {
     }
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/pago_controller.php?accion=editar&id=' . $id);
+        }
         $monto = floatval($_POST['monto'] ?? 0);
         $metodo_pago = sanear($_POST['metodo_pago'] ?? '');
         $observacion = sanear($_POST['observacion'] ?? '');
@@ -784,10 +799,11 @@ function editarPago() {
         </div>
         <div class="card-body">
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Monto (S/.)</label>
-                        <input type="number" name="monto" class="form-control" step="0.01" min="0" 
+                        <input type="number" name="monto" class="form-control" step="0.01" min="0"
                                value="<?php echo $pago['monto']; ?>" required>
                     </div>
                     <div class="form-group">
@@ -858,7 +874,11 @@ function generarPagosMensuales() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         redirigir('controllers/pago_controller.php?accion=listar');
     }
-    
+    if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+        setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+        redirigir('controllers/pago_controller.php?accion=listar');
+    }
+
     $mes = intval($_POST['mes'] ?? 0);
     $anio = intval($_POST['anio'] ?? date('Y'));
     $monto = floatval($_POST['monto'] ?? CUOTA_MANTENIMIENTO);

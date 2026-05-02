@@ -168,8 +168,12 @@ function emitirComprobante() {
     $errores = [];
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
+            setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
+            redirigir('controllers/comprobante_controller.php?accion=emitir&pago_id=' . $pago_id);
+        }
         $tipo_comprobante = sanear($_POST['tipo_comprobante'] ?? '');
-        
+
         if (empty($tipo_comprobante)) {
             $errores[] = 'Seleccione un tipo de comprobante';
         }
@@ -282,6 +286,7 @@ function emitirComprobante() {
             </div>
             
             <form method="POST" data-validate>
+                <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Tipo de Comprobante <span class="required">*</span></label>
                     <select name="tipo_comprobante" class="form-control" required>
