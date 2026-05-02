@@ -764,192 +764,361 @@ function editarCliente() {
 
 function verCliente() {
     global $modelo_cliente;
-    
-    $id = intval($_GET['id'] ?? 0);
+
+    $id      = intval($_GET['id'] ?? 0);
     $cliente = $modelo_cliente->obtenerConResumen($id);
-    
+
     if (!$cliente) {
         setFlashMessage('error', 'Cliente no encontrado');
         redirigir('controllers/cliente_controller.php?accion=listar');
     }
-    
-    // Obtener pagos del cliente
+
     $modelo_pago = new Pago();
-    $pagos = $modelo_pago->obtenerPorCliente($id);
-    
-    $titulo = 'Detalle del Cliente';
-    $subtitulo = $cliente['nombres'] . ' ' . $cliente['apellidos'];
+
+    // Datos de los 3 tipos
+    $pagos_mant  = $modelo_pago->obtenerPorCliente($id, null, 'mantenimiento');
+    $resumen     = $modelo_pago->resumenPorCliente($id);
+    $mant        = $resumen['mantenimiento'];
+    $insc        = $resumen['inscripcion'];
+    $memb        = $resumen['membresia_cuota'];
+
+    // Inscripción: buscar el registro único
+    $db          = Database::getInstance()->getConnection();
+    $stmt        = $db->prepare("SELECT * FROM pagos WHERE cliente_id=:cid AND tipo_pago='inscripcion' LIMIT 1");
+    $stmt->execute([':cid' => $id]);
+    $inscripcion = $stmt->fetch();
+
+    // Membresía: cuotas
+    $stmt_m = $db->prepare("SELECT * FROM pagos WHERE cliente_id=:cid AND tipo_pago='membresia_cuota' ORDER BY cuota_numero ASC");
+    $stmt_m->execute([':cid' => $id]);
+    $cuotas_memb = $stmt_m->fetchAll();
+
+    $deuda_total = $mant['total_deuda'] + $insc['total_deuda'] + $memb['total_deuda'];
+
+    $titulo        = 'Detalle del Cliente';
+    $subtitulo     = $cliente['nombres'] . ' ' . $cliente['apellidos'];
     $pagina_actual = 'clientes';
-    
-    ob_start();
-    ?>
-    
+
+    ob_start(); ?>
+
+    <!-- Fila 1: Info personal + Propiedad -->
     <div class="grid grid-2">
         <div class="card">
             <div class="card-header">
                 <h3><i class="fas fa-user"></i> Información Personal</h3>
-                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>" 
+                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>"
                    class="btn btn-outline btn-sm">
                     <i class="fas fa-edit"></i> Editar
                 </a>
             </div>
             <div class="card-body">
                 <ul class="detail-list">
-                    <li>
-                        <span class="label">Nombres y Apellidos</span>
-                        <span class="value"><?php echo $cliente['nombres'] . ' ' . $cliente['apellidos']; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">DNI</span>
-                        <span class="value"><?php echo $cliente['dni']; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">RUC</span>
-                        <span class="value"><?php echo $cliente['ruc'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Teléfono</span>
-                        <span class="value"><?php echo $cliente['telefono'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Correo</span>
-                        <span class="value"><?php echo $cliente['correo'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Dirección</span>
-                        <span class="value"><?php echo $cliente['direccion'] ?: '-'; ?></span>
-                    </li>
+                    <li><span class="label">Nombres y Apellidos</span>
+                        <span class="value"><?php echo $cliente['nombres'] . ' ' . $cliente['apellidos']; ?></span></li>
+                    <li><span class="label">DNI</span>
+                        <span class="value"><?php echo $cliente['dni']; ?></span></li>
+                    <li><span class="label">RUC</span>
+                        <span class="value"><?php echo $cliente['ruc'] ?: '-'; ?></span></li>
+                    <li><span class="label">Teléfono</span>
+                        <span class="value"><?php echo $cliente['telefono'] ?: '-'; ?></span></li>
+                    <li><span class="label">Correo</span>
+                        <span class="value"><?php echo $cliente['correo'] ?: '-'; ?></span></li>
+                    <li><span class="label">Dirección</span>
+                        <span class="value"><?php echo $cliente['direccion'] ?: '-'; ?></span></li>
                 </ul>
             </div>
         </div>
-        
+
         <div class="card">
             <div class="card-header">
                 <h3><i class="fas fa-home"></i> Propiedad</h3>
             </div>
             <div class="card-body">
                 <ul class="detail-list">
-                    <li>
-                        <span class="label">Número de Lote</span>
-                        <span class="value"><?php echo $cliente['numero_lote']; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Manzana</span>
-                        <span class="value"><?php echo $cliente['manzana'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Etapa</span>
-                        <span class="value"><?php echo $cliente['etapa'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Estado</span>
+                    <li><span class="label">Número de Lote</span>
+                        <span class="value"><?php echo $cliente['numero_lote']; ?></span></li>
+                    <li><span class="label">Manzana</span>
+                        <span class="value"><?php echo $cliente['manzana'] ?: '-'; ?></span></li>
+                    <li><span class="label">Etapa</span>
+                        <span class="value"><?php echo $cliente['etapa'] ?: '-'; ?></span></li>
+                    <li><span class="label">Estado</span>
                         <span class="value">
                             <span class="badge <?php echo $cliente['estado'] === 'activo' ? 'badge-success' : 'badge-danger'; ?>">
                                 <?php echo ucfirst($cliente['estado']); ?>
                             </span>
-                        </span>
-                    </li>
+                        </span></li>
                 </ul>
             </div>
         </div>
     </div>
-    
+
+    <!-- Fila 2: Resumen consolidado de los 3 tipos -->
     <div class="card mt-3">
         <div class="card-header">
-            <h3><i class="fas fa-chart-pie"></i> Resumen de Pagos</h3>
-        </div>
-        <div class="card-body">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon blue">
-                        <i class="fas fa-list"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="label">Total Registros</div>
-                        <div class="value"><?php echo $cliente['total_pagos']; ?></div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon green">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="label">Pagados</div>
-                        <div class="value"><?php echo $cliente['pagos_realizados']; ?></div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon yellow">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="label">Pendientes</div>
-                        <div class="value"><?php echo $cliente['pagos_pendientes']; ?></div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon red">
-                        <i class="fas fa-exclamation"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="label">Vencidos</div>
-                        <div class="value"><?php echo $cliente['pagos_vencidos']; ?></div>
-                    </div>
-                </div>
-            </div>
-            
-            <p style="text-align: center; font-size: 1.1rem; margin-top: 1rem;">
-                <strong>Total Pagado:</strong> <?php echo formatearMoneda($cliente['total_pagado']); ?>
-            </p>
-        </div>
-    </div>
-    
-    <?php if (!empty($pagos)): ?>
-    <div class="card mt-3">
-        <div class="card-header">
-            <h3><i class="fas fa-receipt"></i> Historial de Pagos</h3>
+            <h3><i class="fas fa-chart-pie"></i> Resumen Financiero</h3>
+            <?php if ($deuda_total > 0): ?>
+                <span class="badge badge-danger" style="font-size:.9rem; padding:.4rem .8rem;">
+                    Deuda total: <?php echo formatearMoneda($deuda_total); ?>
+                </span>
+            <?php else: ?>
+                <span class="badge badge-success" style="font-size:.9rem; padding:.4rem .8rem;">
+                    Al día
+                </span>
+            <?php endif; ?>
         </div>
         <div class="card-body">
             <div class="table-container">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Mes/Año</th>
-                            <th>Monto</th>
-                            <th>Vencimiento</th>
+                            <th>Concepto</th>
+                            <th>Registros</th>
+                            <th>Pagados</th>
+                            <th>Pendientes</th>
+                            <th>Total Pagado</th>
+                            <th>Deuda</th>
                             <th>Estado</th>
-                            <th>Fecha Pago</th>
-                            <th>Método</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($pagos as $pago): ?>
-                            <tr>
-                                <td><?php echo nombreMes($pago['mes']) . ' ' . $pago['anio']; ?></td>
-                                <td><?php echo formatearMoneda($pago['monto']); ?></td>
-                                <td><?php echo formatearFecha($pago['fecha_vencimiento']); ?></td>
-                                <td>
-                                    <span class="badge <?php echo claseEstadoPago($pago['estado']); ?>">
-                                        <?php echo textoEstadoPago($pago['estado']); ?>
-                                    </span>
-                                </td>
-                                <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
-                                <td><?php echo $pago['metodo_pago'] ? nombreMetodoPago($pago['metodo_pago']) : '-'; ?></td>
-                            </tr>
-                        <?php endforeach; ?>
+                        <!-- Mantenimiento -->
+                        <tr>
+                            <td><i class="fas fa-money-bill-wave" style="color:var(--color-primario)"></i> <strong>Mantenimiento Mensual</strong></td>
+                            <td><?php echo $mant['total']; ?></td>
+                            <td><span class="badge badge-success"><?php echo $mant['pagados']; ?></span></td>
+                            <td><span class="badge <?php echo ($mant['pendientes']+$mant['vencidos'])>0 ? 'badge-warning' : 'badge-secondary'; ?>"><?php echo $mant['pendientes'] + $mant['vencidos']; ?></span></td>
+                            <td><?php echo formatearMoneda($mant['total_pagado']); ?></td>
+                            <td style="color:<?php echo $mant['total_deuda']>0 ? 'var(--color-peligro)' : 'var(--color-exito)'; ?>; font-weight:600;">
+                                <?php echo formatearMoneda($mant['total_deuda']); ?>
+                            </td>
+                            <td>
+                                <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=listar&cliente_id=<?php echo $id; ?>" class="btn btn-sm btn-outline">Ver</a>
+                            </td>
+                        </tr>
+                        <!-- Inscripción -->
+                        <tr>
+                            <td><i class="fas fa-file-signature" style="color:var(--color-info)"></i> <strong>Inscripción</strong></td>
+                            <td><?php echo $insc['total'] ?: '—'; ?></td>
+                            <td><?php echo $insc['total'] ? '<span class="badge badge-' . ($insc['pagados']>0 ? 'success' : 'secondary') . '">' . $insc['pagados'] . '</span>' : '—'; ?></td>
+                            <td><?php echo $insc['total'] ? '<span class="badge badge-' . (($insc['pendientes']+$insc['vencidos'])>0 ? 'warning' : 'secondary') . '">' . ($insc['pendientes']+$insc['vencidos']) . '</span>' : '—'; ?></td>
+                            <td><?php echo formatearMoneda($insc['total_pagado']); ?></td>
+                            <td style="color:<?php echo $insc['total_deuda']>0 ? 'var(--color-peligro)' : 'var(--color-exito)'; ?>; font-weight:600;">
+                                <?php echo $insc['total'] ? formatearMoneda($insc['total_deuda']) : '—'; ?>
+                            </td>
+                            <td>
+                                <?php if ($insc['total']): ?>
+                                    <a href="<?php echo APP_URL; ?>/controllers/inscripcion_controller.php?accion=listar" class="btn btn-sm btn-outline">Ver</a>
+                                <?php else: ?>
+                                    <a href="<?php echo APP_URL; ?>/controllers/inscripcion_controller.php?accion=registrar" class="btn btn-sm btn-primary">Registrar</a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <!-- Membresía -->
+                        <tr>
+                            <td><i class="fas fa-id-card" style="color:var(--color-advertencia)"></i> <strong>Membresía Club</strong></td>
+                            <td><?php echo $memb['total'] ? $memb['pagados'].'/'.$memb['total'].' cuotas' : '—'; ?></td>
+                            <td><?php echo $memb['total'] ? '<span class="badge badge-success">'.$memb['pagados'].'</span>' : '—'; ?></td>
+                            <td><?php echo $memb['total'] ? '<span class="badge badge-'.( ($memb['pendientes']+$memb['vencidos'])>0 ? 'warning' : 'secondary').'">' . ($memb['pendientes']+$memb['vencidos']) . '</span>' : '—'; ?></td>
+                            <td><?php echo formatearMoneda($memb['total_pagado']); ?></td>
+                            <td style="color:<?php echo $memb['total_deuda']>0 ? 'var(--color-peligro)' : 'var(--color-exito)'; ?>; font-weight:600;">
+                                <?php echo $memb['total'] ? formatearMoneda($memb['total_deuda']) : '—'; ?>
+                            </td>
+                            <td>
+                                <?php if ($memb['total']): ?>
+                                    <a href="<?php echo APP_URL; ?>/controllers/membresia_controller.php?accion=ver&cliente_id=<?php echo $id; ?>" class="btn btn-sm btn-outline">Ver cuotas</a>
+                                <?php else: ?>
+                                    <a href="<?php echo APP_URL; ?>/controllers/membresia_controller.php?accion=registrar" class="btn btn-sm btn-primary">Registrar</a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-    <?php endif; ?>
-    
+
+    <!-- Fila 3: Historial con tabs -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3><i class="fas fa-history"></i> Historial de Pagos</h3>
+        </div>
+        <div class="card-body">
+
+            <!-- Tabs -->
+            <div style="display:flex;gap:4px;border-bottom:2px solid var(--color-borde);margin-bottom:1.25rem;">
+                <button class="tab-btn-cli active" data-tab="tab-mant"
+                        style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;font-size:.95rem;">
+                    <i class="fas fa-money-bill-wave"></i> Mantenimiento
+                    <span class="badge badge-info" style="margin-left:4px;"><?php echo count($pagos_mant); ?></span>
+                </button>
+                <button class="tab-btn-cli" data-tab="tab-insc"
+                        style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;font-size:.95rem;">
+                    <i class="fas fa-file-signature"></i> Inscripción
+                    <?php if ($inscripcion): ?>
+                        <span class="badge <?php echo claseEstadoPago($inscripcion['estado']); ?>" style="margin-left:4px;"><?php echo textoEstadoPago($inscripcion['estado']); ?></span>
+                    <?php endif; ?>
+                </button>
+                <button class="tab-btn-cli" data-tab="tab-memb"
+                        style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;font-size:.95rem;">
+                    <i class="fas fa-id-card"></i> Membresía
+                    <?php if ($memb['total']): ?>
+                        <span class="badge badge-info" style="margin-left:4px;"><?php echo $memb['pagados'].'/'.$memb['total']; ?></span>
+                    <?php endif; ?>
+                </button>
+            </div>
+
+            <!-- Tab Mantenimiento -->
+            <div id="tab-mant" class="tab-content-cli">
+                <?php if (!empty($pagos_mant)): ?>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Mes/Año</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($pagos_mant as $p): ?>
+                            <tr>
+                                <td><?php echo nombreMes($p['mes']) . ' ' . $p['anio']; ?></td>
+                                <td><?php echo formatearMoneda($p['monto']); ?></td>
+                                <td><?php echo formatearFecha($p['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($p['estado']); ?>"><?php echo textoEstadoPago($p['estado']); ?></span></td>
+                                <td><?php echo $p['fecha_pago'] ? formatearFecha($p['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $p['metodo_pago'] ? nombreMetodoPago($p['metodo_pago']) : '-'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                    <div class="empty-state"><i class="fas fa-money-bill-wave"></i><h3>Sin pagos de mantenimiento</h3></div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Tab Inscripción -->
+            <div id="tab-insc" class="tab-content-cli" style="display:none;">
+                <?php if ($inscripcion): ?>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Concepto</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th><th>Acciones</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td>Inscripción / Empadronamiento</td>
+                                <td><?php echo formatearMoneda($inscripcion['monto']); ?></td>
+                                <td><?php echo formatearFecha($inscripcion['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($inscripcion['estado']); ?>"><?php echo textoEstadoPago($inscripcion['estado']); ?></span></td>
+                                <td><?php echo $inscripcion['fecha_pago'] ? formatearFecha($inscripcion['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $inscripcion['metodo_pago'] ? nombreMetodoPago($inscripcion['metodo_pago']) : '-'; ?></td>
+                                <td>
+                                    <?php if ($inscripcion['estado'] !== 'pagado'): ?>
+                                        <a href="<?php echo APP_URL; ?>/controllers/inscripcion_controller.php?accion=marcar_pagado&id=<?php echo $inscripcion['id']; ?>"
+                                           class="btn btn-sm btn-success">
+                                            <i class="fas fa-check"></i> Pagar
+                                        </a>
+                                    <?php else: ?>
+                                        <span style="color:var(--color-exito)"><i class="fas fa-check-circle"></i> Pagada</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-file-signature"></i>
+                        <h3>Sin inscripción registrada</h3>
+                        <a href="<?php echo APP_URL; ?>/controllers/inscripcion_controller.php?accion=registrar" class="btn btn-primary mt-2">
+                            <i class="fas fa-plus"></i> Registrar Inscripción
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Tab Membresía -->
+            <div id="tab-memb" class="tab-content-cli" style="display:none;">
+                <?php if (!empty($cuotas_memb)): ?>
+                <?php
+                $plan_total   = $cuotas_memb[0]['total_cuotas'];
+                $c_pagadas    = count(array_filter($cuotas_memb, fn($c) => $c['estado'] === 'pagado'));
+                $pct_memb     = $plan_total > 0 ? round(($c_pagadas / $plan_total) * 100) : 0;
+                ?>
+                <div style="margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:6px;">
+                        <span><?php echo $c_pagadas; ?> / <?php echo $plan_total; ?> cuotas pagadas</span>
+                        <strong><?php echo $pct_memb; ?>%</strong>
+                    </div>
+                    <div style="background:var(--color-borde);border-radius:6px;height:10px;overflow:hidden;">
+                        <div style="width:<?php echo $pct_memb; ?>%;background:var(--color-primario);height:100%;border-radius:6px;"></div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Cuota</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th><th>Acciones</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($cuotas_memb as $c): ?>
+                            <tr>
+                                <td><span class="badge badge-info"><?php echo $c['cuota_numero']; ?>/<?php echo $c['total_cuotas']; ?></span></td>
+                                <td><?php echo formatearMoneda($c['monto']); ?></td>
+                                <td><?php echo formatearFecha($c['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($c['estado']); ?>"><?php echo textoEstadoPago($c['estado']); ?></span></td>
+                                <td><?php echo $c['fecha_pago'] ? formatearFecha($c['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $c['metodo_pago'] ? nombreMetodoPago($c['metodo_pago']) : '-'; ?></td>
+                                <td>
+                                    <?php if ($c['estado'] !== 'pagado'): ?>
+                                        <a href="<?php echo APP_URL; ?>/controllers/membresia_controller.php?accion=marcar_cuota&id=<?php echo $c['id']; ?>"
+                                           class="btn btn-sm btn-success">
+                                            <i class="fas fa-check"></i> Pagar
+                                        </a>
+                                    <?php else: ?>
+                                        <span style="color:var(--color-exito)"><i class="fas fa-check-circle"></i></span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-id-card"></i>
+                        <h3>Sin membresía registrada</h3>
+                        <a href="<?php echo APP_URL; ?>/controllers/membresia_controller.php?accion=registrar" class="btn btn-primary mt-2">
+                            <i class="fas fa-plus"></i> Registrar Membresía
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+        </div>
+    </div>
+
     <div class="mt-3">
         <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=listar" class="btn btn-outline">
             <i class="fas fa-arrow-left"></i> Volver al listado
         </a>
     </div>
-    
+
+    <script>
+    (function() {
+        const btns = document.querySelectorAll('.tab-btn-cli');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => {
+                    b.classList.remove('active');
+                    b.style.color            = 'var(--color-texto-claro)';
+                    b.style.borderBottomColor = 'transparent';
+                    b.style.fontWeight       = 'normal';
+                });
+                document.querySelectorAll('.tab-content-cli').forEach(c => c.style.display = 'none');
+                btn.classList.add('active');
+                btn.style.color            = 'var(--color-primario)';
+                btn.style.borderBottomColor = 'var(--color-primario)';
+                btn.style.fontWeight       = '600';
+                document.getElementById(btn.dataset.tab).style.display = 'block';
+            });
+        });
+        // Activar el primero al cargar
+        if (btns.length) btns[0].click();
+    })();
+    </script>
+
     <?php
     $contenido = ob_get_clean();
     vista('partials/admin-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));

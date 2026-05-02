@@ -9,22 +9,28 @@ class Pago extends ModeloBase {
     protected $tabla = 'pagos';
     
     /**
-     * Obtener pagos de un cliente
+     * Obtener pagos de un cliente filtrados por tipo
      */
-    public function obtenerPorCliente($cliente_id, $anio = null) {
+    public function obtenerPorCliente($cliente_id, $anio = null, $tipo_pago = 'mantenimiento') {
         $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre, c.numero_lote
                 FROM {$this->tabla} p
                 INNER JOIN clientes c ON p.cliente_id = c.id
-                WHERE p.cliente_id = :cliente_id";
-        
-        $params = [':cliente_id' => $cliente_id];
-        
+                WHERE p.cliente_id = :cliente_id
+                AND p.tipo_pago = :tipo_pago";
+
+        $params = [
+            ':cliente_id' => $cliente_id,
+            ':tipo_pago'  => $tipo_pago,
+        ];
+
         if ($anio) {
             $sql .= " AND p.anio = :anio";
             $params[':anio'] = $anio;
         }
-        
-        $sql .= " ORDER BY p.anio DESC, p.mes DESC";
+
+        $orden = ($tipo_pago === 'mantenimiento') ? 'p.anio DESC, p.mes DESC' : 'p.cuota_numero ASC';
+        $sql .= " ORDER BY {$orden}";
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -34,9 +40,13 @@ class Pago extends ModeloBase {
      * Obtener todos los pagos con filtros
      */
     public function obtenerConFiltros($filtros = [], $pagina = 1, $por_pagina = 15) {
-        // Construir WHERE y params una sola vez para reutilizar
         $whereClauses = ["1=1"];
         $params = [];
+
+        // Tipo de pago — por defecto mantenimiento para no mezclar vistas
+        $tipo = !empty($filtros['tipo_pago']) ? strval($filtros['tipo_pago']) : 'mantenimiento';
+        $whereClauses[] = "p.tipo_pago = :tipo_pago";
+        $params[':tipo_pago'] = $tipo;
 
         if (!empty($filtros['cliente_id'])) {
             $whereClauses[] = "p.cliente_id = :cliente_id";
@@ -69,6 +79,11 @@ class Pago extends ModeloBase {
             $params[':busq1'] = "%{$filtros['busqueda']}%";
             $params[':busq2'] = "%{$filtros['busqueda']}%";
             $params[':busq3'] = "%{$filtros['busqueda']}%";
+        }
+
+        if (!empty($filtros['etapa'])) {
+            $whereClauses[] = "c.etapa = :etapa";
+            $params[':etapa'] = strval($filtros['etapa']);
         }
 
         $whereSQL = "WHERE " . implode(" AND ", $whereClauses);
@@ -211,25 +226,99 @@ class Pago extends ModeloBase {
     }
     
     /**
-     * Verificar si ya existe pago para cliente/mes/año
+     * Verificar si ya existe pago de mantenimiento para cliente/mes/año
      */
     public function existePago($cliente_id, $mes, $anio, $excluir_id = null) {
-        $sql = "SELECT COUNT(*) as total FROM {$this->tabla} 
-                WHERE cliente_id = :cliente_id AND mes = :mes AND anio = :anio";
+        $sql = "SELECT COUNT(*) as total FROM {$this->tabla}
+                WHERE cliente_id = :cliente_id AND tipo_pago = 'mantenimiento'
+                AND mes = :mes AND anio = :anio";
         $params = [
             ':cliente_id' => $cliente_id,
-            ':mes' => $mes,
-            ':anio' => $anio
+            ':mes'        => $mes,
+            ':anio'       => $anio,
         ];
-        
+
         if ($excluir_id) {
             $sql .= " AND id != :id";
             $params[':id'] = $excluir_id;
         }
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        $resultado = $stmt->fetch();
-        return $resultado['total'] > 0;
+        return $stmt->fetch()['total'] > 0;
+    }
+
+    /**
+     * Verificar si ya existe inscripción para un cliente
+     */
+    public function existeInscripcion($cliente_id) {
+        $sql = "SELECT COUNT(*) as total FROM {$this->tabla}
+                WHERE cliente_id = :cliente_id AND tipo_pago = 'inscripcion'";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':cliente_id' => $cliente_id]);
+        return $stmt->fetch()['total'] > 0;
+    }
+
+    /**
+     * Generar plan de cuotas de membresía para un cliente
+     * Retorna la cantidad de cuotas creadas (0 si ya existen)
+     */
+    public function generarCuotasMembresia($cliente_id, $monto_cuota, $total_cuotas, $registrado_por = null) {
+        $creadas = 0;
+
+        // Obtener cuotas ya existentes
+        $stmt = $this->db->prepare(
+            "SELECT MAX(cuota_numero) as ultima FROM {$this->tabla}
+             WHERE cliente_id = :cid AND tipo_pago = 'membresia_cuota'"
+        );
+        $stmt->execute([':cid' => $cliente_id]);
+        $ultima = intval($stmt->fetch()['ultima']);
+
+        for ($n = $ultima + 1; $n <= $total_cuotas; $n++) {
+            $fecha_venc = date('Y-m-t', mktime(0, 0, 0, date('n') + ($n - $ultima - 1), 1, date('Y')));
+            $this->insertar([
+                'cliente_id'    => $cliente_id,
+                'tipo_pago'     => 'membresia_cuota',
+                'cuota_numero'  => $n,
+                'total_cuotas'  => $total_cuotas,
+                'monto'         => $monto_cuota,
+                'fecha_vencimiento' => $fecha_venc,
+                'estado'        => 'pendiente',
+                'registrado_por' => $registrado_por,
+            ]);
+            $creadas++;
+        }
+
+        return $creadas;
+    }
+
+    /**
+     * Obtener resumen de todos los tipos de pago de un cliente
+     */
+    public function resumenPorCliente($cliente_id) {
+        $sql = "SELECT
+                    tipo_pago,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN estado = 'pagado'   THEN 1 ELSE 0 END) as pagados,
+                    SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
+                    SUM(CASE WHEN estado = 'vencido'  THEN 1 ELSE 0 END) as vencidos,
+                    SUM(CASE WHEN estado = 'pagado'   THEN monto ELSE 0 END) as total_pagado,
+                    SUM(CASE WHEN estado != 'pagado'  THEN monto ELSE 0 END) as total_deuda
+                FROM {$this->tabla}
+                WHERE cliente_id = :cliente_id
+                GROUP BY tipo_pago";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':cliente_id' => $cliente_id]);
+        $rows = $stmt->fetchAll();
+
+        $resumen = [
+            'mantenimiento'   => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+            'inscripcion'     => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+            'membresia_cuota' => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+        ];
+        foreach ($rows as $row) {
+            $resumen[$row['tipo_pago']] = $row;
+        }
+        return $resumen;
     }
 }

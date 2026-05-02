@@ -26,7 +26,15 @@
             </a>
             <a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=listar" class="nav-link <?php echo ($pagina_actual === 'pagos') ? 'active' : ''; ?>">
                 <i class="fas fa-money-bill-wave"></i>
-                <span>Pagos</span>
+                <span>Mantenimiento</span>
+            </a>
+            <a href="<?php echo APP_URL; ?>/controllers/inscripcion_controller.php?accion=listar" class="nav-link <?php echo ($pagina_actual === 'inscripciones') ? 'active' : ''; ?>">
+                <i class="fas fa-file-signature"></i>
+                <span>Inscripciones</span>
+            </a>
+            <a href="<?php echo APP_URL; ?>/controllers/membresia_controller.php?accion=listar" class="nav-link <?php echo ($pagina_actual === 'membresia') ? 'active' : ''; ?>">
+                <i class="fas fa-id-card"></i>
+                <span>Membresía Club</span>
             </a>
             <a href="<?php echo APP_URL; ?>/controllers/comprobante_controller.php?accion=listar" class="nav-link <?php echo ($pagina_actual === 'comprobantes') ? 'active' : ''; ?>">
                 <i class="fas fa-file-invoice"></i>

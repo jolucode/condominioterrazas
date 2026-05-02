@@ -67,6 +67,9 @@ define('SESSION_NAME', 'condominio_session');
 // CONFIGURACIÓN DE PAGOS
 // ============================================
 define('CUOTA_MANTENIMIENTO', 70.00);
+define('MONTO_INSCRIPCION', 800.00);
+define('MONTO_MEMBRESIA', 5000.00);
+define('CUOTAS_MEMBRESIA', 20);
 define('MONEDA', 'S/.');
 define('MONEDA_ISO', 'PEN');
 

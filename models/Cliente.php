@@ -134,15 +134,15 @@ class Cliente extends ModeloBase {
             $existe = $stmt->fetch()['total'];
             
             if ($existe == 0) {
-                $sql_insert = "INSERT INTO pagos (cliente_id, mes, anio, monto, fecha_vencimiento, estado) 
-                              VALUES (:cliente_id, :mes, :anio, :monto, :fecha_vencimiento, 'pendiente')";
+                $sql_insert = "INSERT INTO pagos (cliente_id, tipo_pago, mes, anio, monto, fecha_vencimiento, estado)
+                              VALUES (:cliente_id, 'mantenimiento', :mes, :anio, :monto, :fecha_vencimiento, 'pendiente')";
                 $stmt_insert = $this->db->prepare($sql_insert);
                 $stmt_insert->execute([
-                    ':cliente_id' => $cliente['id'],
-                    ':mes' => $mes,
-                    ':anio' => $anio,
-                    ':monto' => $monto,
-                    ':fecha_vencimiento' => $fecha_vencimiento
+                    ':cliente_id'       => $cliente['id'],
+                    ':mes'              => $mes,
+                    ':anio'             => $anio,
+                    ':monto'            => $monto,
+                    ':fecha_vencimiento' => $fecha_vencimiento,
                 ]);
                 $creados++;
             }
@@ -151,6 +151,17 @@ class Cliente extends ModeloBase {
         return $creados;
     }
     
+    /**
+     * Obtener etapas distintas registradas (para filtros)
+     */
+    public function obtenerEtapas() {
+        $sql = "SELECT DISTINCT etapa FROM {$this->tabla}
+                WHERE etapa IS NOT NULL AND etapa != ''
+                ORDER BY etapa ASC";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
     /**
      * Estadísticas generales de clientes
      */

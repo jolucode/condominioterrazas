@@ -185,6 +185,23 @@ function crearReunion() {
             $reunion_id = $modelo_reunion->crearConAcuerdos($datos_reunion, $acuerdos);
             
             if ($reunion_id) {
+                // Subir acta si se adjuntó
+                if (isset($_FILES['acta']) && $_FILES['acta']['error'] === UPLOAD_ERR_OK) {
+                    $resultado = subirArchivo($_FILES['acta']);
+                    if (isset($resultado['success'])) {
+                        $modelo_archivo = new ArchivoAdjunto();
+                        $modelo_archivo->guardarArchivo([
+                            'reunion_id'      => $reunion_id,
+                            'nombre_original' => $resultado['nombre_original'],
+                            'nombre_archivo'  => $resultado['nombre_archivo'],
+                            'tipo_archivo'    => $resultado['tipo_archivo'],
+                            'tamano'          => $resultado['tamano'],
+                            'ruta_archivo'    => $resultado['ruta_archivo'],
+                            'subido_por'      => $_SESSION['usuario_id'],
+                        ]);
+                    }
+                }
+
                 $db = Database::getInstance()->getConnection();
                 registrarAuditoria($db, 'create', 'reuniones', $reunion_id, "Reunión creada: {$titulo}");
                 setFlashMessage('success', 'Reunión creada exitosamente');
@@ -220,7 +237,7 @@ function crearReunion() {
                 </div>
             <?php endif; ?>
             
-            <form method="POST" data-validate>
+            <form method="POST" data-validate enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Título <span class="required">*</span></label>
@@ -308,6 +325,12 @@ function crearReunion() {
                     </div>
                 </script>
                 
+                <div class="form-group">
+                    <label><i class="fas fa-file-pdf"></i> Acta de la Reunión <span style="color:var(--color-texto-claro);font-weight:normal;">(opcional, PDF recomendado)</span></label>
+                    <input type="file" name="acta" class="form-control" accept=".pdf,.doc,.docx">
+                    <small style="color:var(--color-texto-claro);">Máximo <?php echo UPLOAD_MAX_SIZE / 1024 / 1024; ?>MB. Formatos: PDF, DOC, DOCX</small>
+                </div>
+
                 <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Guardar Reunión
@@ -319,7 +342,7 @@ function crearReunion() {
             </form>
         </div>
     </div>
-    
+
     <?php
     $contenido = ob_get_clean();
     vista('partials/admin-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
@@ -329,12 +352,16 @@ function editarReunion() {
     global $modelo_reunion;
     $id = intval($_GET['id'] ?? 0);
     $reunion = $modelo_reunion->obtenerConAcuerdos($id);
-    
+
     if (!$reunion) {
         setFlashMessage('error', 'Reunión no encontrada');
         redirigir('controllers/reunion_controller.php?accion=listar');
     }
-    
+
+    $modelo_archivo = new ArchivoAdjunto();
+    $archivos       = $modelo_archivo->obtenerPorReunion($id);
+    $acta_actual    = !empty($archivos) ? $archivos[0] : null;
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!validarTokenCSRF($_POST['csrf_token'] ?? '')) {
             setFlashMessage('error', 'Token de seguridad inválido. Intente nuevamente.');
@@ -364,6 +391,24 @@ function editarReunion() {
         ];
         
         if ($modelo_reunion->actualizarConAcuerdos($id, $datos_reunion, $acuerdos)) {
+            // Reemplazar acta si se sube una nueva
+            if (isset($_FILES['acta']) && $_FILES['acta']['error'] === UPLOAD_ERR_OK) {
+                if ($acta_actual) {
+                    $modelo_archivo->eliminarConArchivo($acta_actual['id']);
+                }
+                $resultado = subirArchivo($_FILES['acta']);
+                if (isset($resultado['success'])) {
+                    $modelo_archivo->guardarArchivo([
+                        'reunion_id'      => $id,
+                        'nombre_original' => $resultado['nombre_original'],
+                        'nombre_archivo'  => $resultado['nombre_archivo'],
+                        'tipo_archivo'    => $resultado['tipo_archivo'],
+                        'tamano'          => $resultado['tamano'],
+                        'ruta_archivo'    => $resultado['ruta_archivo'],
+                        'subido_por'      => $_SESSION['usuario_id'],
+                    ]);
+                }
+            }
             setFlashMessage('success', 'Reunión actualizada exitosamente');
             redirigir('controllers/reunion_controller.php?accion=ver&id=' . $id);
         } else {
@@ -386,7 +431,7 @@ function editarReunion() {
             </a>
         </div>
         <div class="card-body">
-            <form method="POST" data-validate>
+            <form method="POST" data-validate enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo generarTokenCSRF(); ?>">
                 <div class="form-group">
                     <label>Título <span class="required">*</span></label>
@@ -471,6 +516,27 @@ function editarReunion() {
                     </div>
                 </script>
                 
+                <!-- Acta adjunta -->
+                <div class="form-group">
+                    <label><i class="fas fa-file-pdf"></i> Acta de la Reunión</label>
+                    <?php if ($acta_actual): ?>
+                        <div style="padding:.75rem;background:var(--color-fondo);border-radius:var(--radio);margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem;">
+                            <i class="fas fa-file-pdf" style="color:#e53935;font-size:1.25rem;"></i>
+                            <div style="flex:1;">
+                                <strong><?php echo htmlspecialchars($acta_actual['nombre_original']); ?></strong>
+                                <br><small style="color:var(--color-texto-claro);"><?php echo round($acta_actual['tamano']/1024, 1); ?> KB</small>
+                            </div>
+                            <a href="<?php echo APP_URL; ?>/controllers/archivo_controller.php?accion=descargar&id=<?php echo $acta_actual['id']; ?>"
+                               class="btn btn-sm btn-outline" target="_blank">
+                                <i class="fas fa-download"></i> Ver
+                            </a>
+                        </div>
+                        <small style="color:var(--color-texto-claro);">Sube un nuevo archivo para reemplazar el acta actual.</small>
+                    <?php endif; ?>
+                    <input type="file" name="acta" class="form-control mt-1" accept=".pdf,.doc,.docx">
+                    <small style="color:var(--color-texto-claro);">Máximo <?php echo UPLOAD_MAX_SIZE / 1024 / 1024; ?>MB. Formatos: PDF, DOC, DOCX</small>
+                </div>
+
                 <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Actualizar Reunión
@@ -482,7 +548,7 @@ function editarReunion() {
             </form>
         </div>
     </div>
-    
+
     <?php
     $contenido = ob_get_clean();
     vista('partials/admin-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
@@ -492,14 +558,18 @@ function verReunion() {
     global $modelo_reunion;
     $id = intval($_GET['id'] ?? 0);
     $reunion = $modelo_reunion->obtenerConAcuerdos($id);
-    
+
     if (!$reunion) {
         setFlashMessage('error', 'Reunión no encontrada');
         redirigir('controllers/reunion_controller.php?accion=listar');
     }
-    
-    $titulo = $reunion['titulo'];
-    $subtitulo = 'Detalle de la reunión';
+
+    $modelo_archivo = new ArchivoAdjunto();
+    $archivos       = $modelo_archivo->obtenerPorReunion($id);
+    $acta           = !empty($archivos) ? $archivos[0] : null;
+
+    $titulo        = $reunion['titulo'];
+    $subtitulo     = 'Detalle de la reunión';
     $pagina_actual = 'reuniones';
     
     ob_start();
@@ -509,7 +579,13 @@ function verReunion() {
         <div class="card-header">
             <h3><?php echo $reunion['titulo']; ?></h3>
             <div class="d-flex gap-1">
-                <a href="<?php echo APP_URL; ?>/controllers/reunion_controller.php?accion=editar&id=<?php echo $reunion['id']; ?>" 
+                <?php if ($acta): ?>
+                    <a href="<?php echo APP_URL; ?>/controllers/archivo_controller.php?accion=descargar&id=<?php echo $acta['id']; ?>"
+                       class="btn btn-success btn-sm" target="_blank">
+                        <i class="fas fa-file-pdf"></i> Descargar Acta
+                    </a>
+                <?php endif; ?>
+                <a href="<?php echo APP_URL; ?>/controllers/reunion_controller.php?accion=editar&id=<?php echo $reunion['id']; ?>"
                    class="btn btn-outline btn-sm">
                     <i class="fas fa-edit"></i> Editar
                 </a>

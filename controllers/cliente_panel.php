@@ -156,74 +156,215 @@ function mostrarInicio($cliente_id) {
 }
 
 function mostrarMisPagos($cliente_id) {
-    $modelo_pago = new Pago();
+    $modelo_pago    = new Pago();
     $modelo_cliente = new Cliente();
-    $cliente = $modelo_cliente->obtenerPorId($cliente_id);
-    
-    $anio = intval($_GET['anio'] ?? date('Y'));
-    $pagos = $modelo_pago->obtenerPorCliente($cliente_id, $anio);
-    
-    $titulo = 'Mis Pagos';
-    $subtitulo = 'Historial de pagos de mantenimiento';
+
+    $anio    = intval($_GET['anio'] ?? date('Y'));
+    $resumen = $modelo_pago->resumenPorCliente($cliente_id);
+    $mant    = $resumen['mantenimiento'];
+    $insc    = $resumen['inscripcion'];
+    $memb    = $resumen['membresia_cuota'];
+
+    $pagos_mant  = $modelo_pago->obtenerPorCliente($cliente_id, $anio, 'mantenimiento');
+
+    $db   = Database::getInstance()->getConnection();
+    $stmt = $db->prepare("SELECT * FROM pagos WHERE cliente_id=:cid AND tipo_pago='inscripcion' LIMIT 1");
+    $stmt->execute([':cid' => $cliente_id]);
+    $inscripcion = $stmt->fetch();
+
+    $stmt_m = $db->prepare("SELECT * FROM pagos WHERE cliente_id=:cid AND tipo_pago='membresia_cuota' ORDER BY cuota_numero ASC");
+    $stmt_m->execute([':cid' => $cliente_id]);
+    $cuotas_memb = $stmt_m->fetchAll();
+
+    $deuda_total = $mant['total_deuda'] + $insc['total_deuda'] + $memb['total_deuda'];
+
+    $titulo      = 'Mis Pagos';
+    $subtitulo   = 'Estado de todos tus pagos';
     $pagina_actual = 'mis_pagos';
-    
-    ob_start();
-    ?>
-    
+
+    ob_start(); ?>
+
+    <!-- Resumen de deuda total -->
+    <?php if ($deuda_total > 0): ?>
+    <div class="alert alert-warning mb-3">
+        <i class="fas fa-exclamation-triangle"></i>
+        Tienes una deuda total de <strong><?php echo formatearMoneda($deuda_total); ?></strong>.
+        Por favor regulariza tus pagos.
+    </div>
+    <?php else: ?>
+    <div class="alert alert-success mb-3" style="background:var(--color-exito-claro,#e8f5e9);color:var(--color-exito,#2e7d32);border:none;border-radius:var(--radio);padding:1rem;">
+        <i class="fas fa-check-circle"></i>
+        <strong>¡Estás al día!</strong> Todos tus pagos están al corriente.
+    </div>
+    <?php endif; ?>
+
     <div class="card">
         <div class="card-header">
-            <h3>Mis Pagos</h3>
-            <form method="GET" style="display: flex; gap: 0.5rem;">
-                <input type="hidden" name="accion" value="mis_pagos">
-                <select name="anio" class="form-control" onchange="this.form.submit()">
-                    <?php for ($a = date('Y'); $a >= date('Y') - 2; $a--): ?>
-                        <option value="<?php echo $a; ?>" <?php echo $a === $anio ? 'selected' : ''; ?>><?php echo $a; ?></option>
-                    <?php endfor; ?>
-                </select>
-            </form>
+            <h3><i class="fas fa-wallet"></i> Mis Pagos</h3>
         </div>
         <div class="card-body">
-            <?php if (!empty($pagos)): ?>
+
+            <!-- Tabs -->
+            <div style="display:flex;gap:4px;border-bottom:2px solid var(--color-borde);margin-bottom:1.25rem;flex-wrap:wrap;">
+                <button class="tab-mis active" data-tab="cp-mant"
+                        style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;">
+                    <i class="fas fa-money-bill-wave"></i> Mantenimiento
+                    <?php if (($mant['pendientes']+$mant['vencidos']) > 0): ?>
+                        <span class="badge badge-warning" style="margin-left:4px;"><?php echo $mant['pendientes']+$mant['vencidos']; ?> pendiente(s)</span>
+                    <?php endif; ?>
+                </button>
+                <button class="tab-mis" data-tab="cp-insc"
+                        style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;">
+                    <i class="fas fa-file-signature"></i> Inscripción
+                    <?php if ($inscripcion && $inscripcion['estado'] !== 'pagado'): ?>
+                        <span class="badge badge-warning" style="margin-left:4px;">Pendiente</span>
+                    <?php elseif ($inscripcion): ?>
+                        <span class="badge badge-success" style="margin-left:4px;">Pagada</span>
+                    <?php endif; ?>
+                </button>
+                <button class="tab-mis" data-tab="cp-memb"
+                        style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;">
+                    <i class="fas fa-id-card"></i> Membresía Club
+                    <?php if ($memb['total']): ?>
+                        <span class="badge badge-info" style="margin-left:4px;"><?php echo $memb['pagados'].'/'.$memb['total']; ?></span>
+                    <?php endif; ?>
+                </button>
+            </div>
+
+            <!-- Tab Mantenimiento -->
+            <div id="cp-mant" class="tab-mis-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+                    <span style="color:var(--color-texto-claro);font-size:.9rem;">
+                        Mostrando pagos del año:
+                    </span>
+                    <form method="GET" style="display:flex;gap:.5rem;">
+                        <input type="hidden" name="accion" value="mis_pagos">
+                        <select name="anio" class="form-control" onchange="this.form.submit()" style="width:auto;">
+                            <?php for ($a = date('Y'); $a >= date('Y') - 2; $a--): ?>
+                                <option value="<?php echo $a; ?>" <?php echo $a === $anio ? 'selected' : ''; ?>><?php echo $a; ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </form>
+                </div>
+                <?php if (!empty($pagos_mant)): ?>
                 <div class="table-container">
                     <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Mes</th>
-                                <th>Monto</th>
-                                <th>Vencimiento</th>
-                                <th>Estado</th>
-                                <th>Fecha Pago</th>
-                                <th>Método</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Mes</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
                         <tbody>
-                            <?php foreach ($pagos as $pago): ?>
-                                <tr>
-                                    <td><?php echo nombreMes($pago['mes']) . ' ' . $pago['anio']; ?></td>
-                                    <td><?php echo formatearMoneda($pago['monto']); ?></td>
-                                    <td><?php echo formatearFecha($pago['fecha_vencimiento']); ?></td>
-                                    <td>
-                                        <span class="badge <?php echo claseEstadoPago($pago['estado']); ?>">
-                                            <?php echo textoEstadoPago($pago['estado']); ?>
-                                        </span>
-                                    </td>
-                                    <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
-                                    <td><?php echo $pago['metodo_pago'] ? nombreMetodoPago($pago['metodo_pago']) : '-'; ?></td>
-                                </tr>
-                            <?php endforeach; ?>
+                        <?php foreach ($pagos_mant as $p): ?>
+                            <tr>
+                                <td><?php echo nombreMes($p['mes']) . ' ' . $p['anio']; ?></td>
+                                <td><?php echo formatearMoneda($p['monto']); ?></td>
+                                <td><?php echo formatearFecha($p['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($p['estado']); ?>"><?php echo textoEstadoPago($p['estado']); ?></span></td>
+                                <td><?php echo $p['fecha_pago'] ? formatearFecha($p['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $p['metodo_pago'] ? nombreMetodoPago($p['metodo_pago']) : '-'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-money-bill-wave"></i>
-                    <h3>No hay pagos registrados</h3>
-                    <p>No se encontraron pagos para el año seleccionado</p>
+                <?php else: ?>
+                    <div class="empty-state"><i class="fas fa-money-bill-wave"></i><h3>Sin pagos para <?php echo $anio; ?></h3></div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Tab Inscripción -->
+            <div id="cp-insc" class="tab-mis-content" style="display:none;">
+                <?php if ($inscripcion): ?>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Concepto</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td>Inscripción / Empadronamiento</td>
+                                <td><?php echo formatearMoneda($inscripcion['monto']); ?></td>
+                                <td><?php echo formatearFecha($inscripcion['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($inscripcion['estado']); ?>"><?php echo textoEstadoPago($inscripcion['estado']); ?></span></td>
+                                <td><?php echo $inscripcion['fecha_pago'] ? formatearFecha($inscripcion['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $inscripcion['metodo_pago'] ? nombreMetodoPago($inscripcion['metodo_pago']) : '-'; ?></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-            <?php endif; ?>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-file-signature"></i>
+                        <h3>Sin inscripción registrada</h3>
+                        <p>Contacta a la administración para registrar tu inscripción</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Tab Membresía -->
+            <div id="cp-memb" class="tab-mis-content" style="display:none;">
+                <?php if (!empty($cuotas_memb)): ?>
+                <?php
+                $plan_t  = $cuotas_memb[0]['total_cuotas'];
+                $pagd    = count(array_filter($cuotas_memb, fn($c) => $c['estado'] === 'pagado'));
+                $pct_m   = $plan_t > 0 ? round(($pagd / $plan_t) * 100) : 0;
+                ?>
+                <div style="margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:6px;">
+                        <span><?php echo $pagd; ?> / <?php echo $plan_t; ?> cuotas pagadas</span>
+                        <strong><?php echo $pct_m; ?>%</strong>
+                    </div>
+                    <div style="background:var(--color-borde);border-radius:6px;height:10px;overflow:hidden;">
+                        <div style="width:<?php echo $pct_m; ?>%;background:<?php echo $pct_m==100?'var(--color-exito)':'var(--color-primario)'; ?>;height:100%;border-radius:6px;"></div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Cuota</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($cuotas_memb as $c): ?>
+                            <tr>
+                                <td><span class="badge badge-info"><?php echo $c['cuota_numero']; ?>/<?php echo $c['total_cuotas']; ?></span></td>
+                                <td><?php echo formatearMoneda($c['monto']); ?></td>
+                                <td><?php echo formatearFecha($c['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($c['estado']); ?>"><?php echo textoEstadoPago($c['estado']); ?></span></td>
+                                <td><?php echo $c['fecha_pago'] ? formatearFecha($c['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $c['metodo_pago'] ? nombreMetodoPago($c['metodo_pago']) : '-'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-id-card"></i>
+                        <h3>Sin membresía registrada</h3>
+                        <p>Contacta a la administración para registrar tu membresía</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+
         </div>
     </div>
-    
+
+    <script>
+    (function() {
+        const btns = document.querySelectorAll('.tab-mis');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => {
+                    b.classList.remove('active');
+                    b.style.color             = 'var(--color-texto-claro)';
+                    b.style.borderBottomColor = 'transparent';
+                    b.style.fontWeight        = 'normal';
+                });
+                document.querySelectorAll('.tab-mis-content').forEach(c => c.style.display = 'none');
+                btn.classList.add('active');
+                btn.style.color             = 'var(--color-primario)';
+                btn.style.borderBottomColor = 'var(--color-primario)';
+                btn.style.fontWeight        = '600';
+                document.getElementById(btn.dataset.tab).style.display = 'block';
+            });
+        });
+        if (btns.length) btns[0].click();
+    })();
+    </script>
+
     <?php
     $contenido = ob_get_clean();
     vista('partials/cliente-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
@@ -293,11 +434,12 @@ function mostrarMisComprobantes($cliente_id) {
 }
 
 function mostrarReuniones($cliente_id) {
-    $modelo_reunion = new Reunion();
-    $reuniones = $modelo_reunion->obtenerPublicadas();
-    
-    $titulo = 'Reuniones y Acuerdos';
-    $subtitulo = 'Historial de reuniones del condominio';
+    $modelo_reunion  = new Reunion();
+    $modelo_archivo  = new ArchivoAdjunto();
+    $reuniones       = $modelo_reunion->obtenerPublicadas();
+
+    $titulo        = 'Reuniones y Acuerdos';
+    $subtitulo     = 'Historial de reuniones del condominio';
     $pagina_actual = 'reuniones';
     
     ob_start();
@@ -313,12 +455,24 @@ function mostrarReuniones($cliente_id) {
                     <?php foreach ($reuniones as $reunion): ?>
                         <?php
                         $modelo_acuerdo = new Acuerdo();
-                        $acuerdos = $modelo_acuerdo->obtenerPorReunion($reunion['id']);
+                        $acuerdos       = $modelo_acuerdo->obtenerPorReunion($reunion['id']);
+                        $archivos_r     = $modelo_archivo->obtenerPorReunion($reunion['id']);
+                        $acta_r         = !empty($archivos_r) ? $archivos_r[0] : null;
                         ?>
                         <div class="timeline-item">
                             <div class="timeline-dot"></div>
                             <div class="timeline-content">
-                                <h4><?php echo $reunion['titulo']; ?></h4>
+                                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
+                                    <h4 style="margin:0;"><?php echo $reunion['titulo']; ?></h4>
+                                    <?php if ($acta_r): ?>
+                                        <a href="<?php echo APP_URL; ?>/controllers/archivo_controller.php?accion=descargar&id=<?php echo $acta_r['id']; ?>"
+                                           class="btn btn-sm btn-success" target="_blank"
+                                           title="Descargar acta de la reunión">
+                                            <i class="fas fa-file-pdf"></i> Descargar Acta
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+
                                 <div class="date">
                                     <i class="fas fa-calendar"></i> <?php echo formatearFecha($reunion['fecha_reunion']); ?>
                                     <?php if ($reunion['hora_reunion']): ?>
@@ -331,9 +485,9 @@ function mostrarReuniones($cliente_id) {
                                         <?php echo textoEstadoReunion($reunion['estado']); ?>
                                     </span>
                                 </div>
-                                
+
                                 <p style="margin-bottom: 1rem;"><?php echo nl2br($reunion['descripcion']); ?></p>
-                                
+
                                 <?php if (!empty($acuerdos)): ?>
                                     <strong>Acuerdos:</strong>
                                     <ul style="margin: 0.5rem 0 0; padding-left: 1.5rem;">
@@ -349,10 +503,10 @@ function mostrarReuniones($cliente_id) {
                                         <?php endforeach; ?>
                                     </ul>
                                 <?php endif; ?>
-                                
+
                                 <?php if ($reunion['proxima_fecha']): ?>
                                     <p style="margin-top: 0.75rem; padding: 0.5rem; background: var(--color-info-claro); border-radius: var(--radio); font-size: 0.85rem;">
-                                        <i class="fas fa-calendar-check"></i> 
+                                        <i class="fas fa-calendar-check"></i>
                                         <strong>Próxima reunión:</strong> <?php echo formatearFecha($reunion['proxima_fecha']); ?>
                                     </p>
                                 <?php endif; ?>

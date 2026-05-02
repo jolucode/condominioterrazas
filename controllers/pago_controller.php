@@ -493,18 +493,18 @@ function registrarPago() {
         
         if (empty($errores)) {
             $fecha_vencimiento = $fecha_vencimiento ?: date('Y-m-t', mktime(0, 0, 0, $mes, 1, $anio));
-            $estado = 'pendiente';
-            
+
             $datos = [
-                'cliente_id' => $cliente_id,
-                'mes' => $mes,
-                'anio' => $anio,
-                'monto' => $monto,
+                'cliente_id'        => $cliente_id,
+                'tipo_pago'         => 'mantenimiento',
+                'mes'               => $mes,
+                'anio'              => $anio,
+                'monto'             => $monto,
                 'fecha_vencimiento' => $fecha_vencimiento,
-                'estado' => $estado,
-                'metodo_pago' => $metodo_pago,
-                'observacion' => $observacion,
-                'registrado_por' => $_SESSION['usuario_id']
+                'estado'            => 'pendiente',
+                'metodo_pago'       => $metodo_pago,
+                'observacion'       => $observacion,
+                'registrado_por'    => $_SESSION['usuario_id'],
             ];
             
             $pago_id = $modelo_pago->registrarPago($datos);

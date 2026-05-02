@@ -59,8 +59,11 @@ CREATE TABLE IF NOT EXISTS clientes (
 CREATE TABLE IF NOT EXISTS pagos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     cliente_id INT NOT NULL,
-    mes INT NOT NULL COMMENT '1-12',
-    anio INT NOT NULL,
+    tipo_pago ENUM('mantenimiento', 'inscripcion', 'membresia_cuota') NOT NULL DEFAULT 'mantenimiento',
+    mes INT NULL COMMENT '1-12, solo para mantenimiento',
+    anio INT NULL COMMENT 'solo para mantenimiento',
+    cuota_numero TINYINT UNSIGNED NULL COMMENT 'N de cuota, solo para membresia_cuota',
+    total_cuotas TINYINT UNSIGNED NULL COMMENT 'total cuotas del plan, solo para membresia_cuota',
     monto DECIMAL(10,2) NOT NULL DEFAULT 70.00,
     fecha_vencimiento DATE NOT NULL,
     fecha_pago DATETIME NULL,
@@ -74,9 +77,10 @@ CREATE TABLE IF NOT EXISTS pagos (
     FOREIGN KEY (registrado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
     INDEX idx_cliente (cliente_id),
     INDEX idx_estado (estado),
+    INDEX idx_tipo_pago (tipo_pago),
     INDEX idx_mes_anio (mes, anio),
     INDEX idx_fecha_pago (fecha_pago),
-    UNIQUE KEY uk_cliente_mes_anio (cliente_id, mes, anio)
+    UNIQUE KEY uk_cliente_tipo_mes_anio (cliente_id, tipo_pago, mes, anio)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
