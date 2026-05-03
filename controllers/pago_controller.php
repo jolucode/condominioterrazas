@@ -41,30 +41,31 @@ switch ($accion) {
 function listarPagos() {
     global $modelo_pago;
     
-    $pagina = intval($_GET['pagina'] ?? 1);
+    $pagina     = intval($_GET['pagina']    ?? 1);
     $cliente_id = intval($_GET['cliente_id'] ?? 0);
-    $estado = sanear($_GET['estado'] ?? '');
-    $mes = isset($_GET['mes']) ? intval($_GET['mes']) : date('n');
-    $anio = isset($_GET['anio']) ? intval($_GET['anio']) : date('Y');
-    $busqueda = sanear($_GET['busqueda'] ?? '');
-    
+    $estado     = sanear($_GET['estado']    ?? '');
+    $mes        = isset($_GET['mes'])  ? intval($_GET['mes'])  : date('n');
+    $anio       = isset($_GET['anio']) ? intval($_GET['anio']) : date('Y');
+    $busqueda   = sanear($_GET['busqueda']  ?? '');
+    $etapa      = sanear($_GET['etapa']     ?? '');
+
     $filtros = [];
     if ($cliente_id) $filtros['cliente_id'] = $cliente_id;
-    if ($estado) $filtros['estado'] = $estado;
-    if ($mes) $filtros['mes'] = $mes;
-    if ($anio) $filtros['anio'] = $anio;
-    if ($busqueda) $filtros['busqueda'] = $busqueda;
-    
-    // Actualizar pagos vencidos
+    if ($estado)     $filtros['estado']     = $estado;
+    if ($mes)        $filtros['mes']        = $mes;
+    if ($anio)       $filtros['anio']       = $anio;
+    if ($busqueda)   $filtros['busqueda']   = $busqueda;
+    if ($etapa)      $filtros['etapa']      = $etapa;
+
     $modelo_pago->actualizarEstadosVencidos();
-    
-    $resultado = $modelo_pago->obtenerConFiltros($filtros, $pagina, 15);
-    $pagos = $resultado['datos'];
+
+    $resultado  = $modelo_pago->obtenerConFiltros($filtros, $pagina, 15);
+    $pagos      = $resultado['datos'];
     $paginacion = $resultado['paginacion'];
-    
-    // Obtener clientes para filtro
+
     $modelo_cliente = new Cliente();
-    $clientes = $modelo_cliente->obtenerActivos();
+    $clientes       = $modelo_cliente->obtenerActivos();
+    $etapas         = $modelo_cliente->obtenerEtapas();
     
     $titulo = 'Gestión de Pagos';
     $subtitulo = 'Administra los pagos de mantenimiento';
@@ -116,6 +117,14 @@ function listarPagos() {
                     <?php for ($a = date('Y'); $a >= date('Y') - 2; $a--): ?>
                         <option value="<?php echo $a; ?>" <?php echo $anio === $a ? 'selected' : ''; ?>><?php echo $a; ?></option>
                     <?php endfor; ?>
+                </select>
+                <select id="etapa-select" class="form-control">
+                    <option value="">Todas las etapas</option>
+                    <?php foreach ($etapas as $et): ?>
+                        <option value="<?php echo htmlspecialchars($et); ?>" <?php echo $etapa === $et ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($et); ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </form>
             
@@ -272,47 +281,48 @@ function listarPagos() {
     <script>
     (function() {
         const busquedaInput = document.getElementById('busqueda-input');
-        const estadoSelect = document.getElementById('estado-select');
-        const mesSelect = document.getElementById('mes-select');
-        const anioSelect = document.getElementById('anio-select');
+        const estadoSelect  = document.getElementById('estado-select');
+        const mesSelect     = document.getElementById('mes-select');
+        const anioSelect    = document.getElementById('anio-select');
+        const etapaSelect   = document.getElementById('etapa-select');
         const currentPageInput = document.getElementById('current-page');
-        const container = document.getElementById('pagos-table-container');
-        const baseUrl = document.getElementById('base-url').value;
+        const container     = document.getElementById('pagos-table-container');
+        const baseUrl       = document.getElementById('base-url').value;
         let searchTimeout;
-        
+
         function cargarPagos(pagina = 1) {
             const busqueda = encodeURIComponent(busquedaInput.value);
-            const estado = encodeURIComponent(estadoSelect.value);
-            const mes = encodeURIComponent(mesSelect.value);
-            const anio = encodeURIComponent(anioSelect.value);
-            
-            const url = `${baseUrl}/controllers/pago_controller.php?accion=listar_ajax&pagina=${pagina}&busqueda=${busqueda}&estado=${estado}&mes=${mes}&anio=${anio}`;
-            
+            const estado   = encodeURIComponent(estadoSelect.value);
+            const mes      = encodeURIComponent(mesSelect.value);
+            const anio     = encodeURIComponent(anioSelect.value);
+            const etapa    = encodeURIComponent(etapaSelect.value);
+
+            const url = `${baseUrl}/controllers/pago_controller.php?accion=listar_ajax&pagina=${pagina}&busqueda=${busqueda}&estado=${estado}&mes=${mes}&anio=${anio}&etapa=${etapa}`;
+
             container.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
-            
+
             fetch(url)
                 .then(response => response.text())
                 .then(html => {
                     container.innerHTML = html;
                     currentPageInput.value = pagina;
                 })
-                .catch(error => {
+                .catch(() => {
                     container.innerHTML = '<div class="alert alert-danger">Error al cargar los datos</div>';
                 });
         }
-        
+
         // Live search con debounce
         busquedaInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(function() {
-                cargarPagos(1);
-            }, 400);
+            searchTimeout = setTimeout(() => cargarPagos(1), 400);
         });
-        
-        // Filtrar por estado, mes y anio
+
+        // Filtrar por estado, mes, anio y etapa
         estadoSelect.addEventListener('change', () => cargarPagos(1));
-        mesSelect.addEventListener('change', () => cargarPagos(1));
-        anioSelect.addEventListener('change', () => cargarPagos(1));
+        mesSelect.addEventListener('change',    () => cargarPagos(1));
+        anioSelect.addEventListener('change',   () => cargarPagos(1));
+        etapaSelect.addEventListener('change',  () => cargarPagos(1));
         
         // Paginación AJAX
         container.addEventListener('click', function(e) {
@@ -337,18 +347,20 @@ function listarPagos() {
 
 function listarPagosAjax() {
     global $modelo_pago;
-    
-    $pagina = intval($_GET['pagina'] ?? 1);
-    $estado = sanear($_GET['estado'] ?? '');
-    $mes = isset($_GET['mes']) ? intval($_GET['mes']) : date('n');
-    $anio = isset($_GET['anio']) ? intval($_GET['anio']) : date('Y');
+
+    $pagina   = intval($_GET['pagina']   ?? 1);
+    $estado   = sanear($_GET['estado']   ?? '');
+    $mes      = isset($_GET['mes'])  ? intval($_GET['mes'])  : date('n');
+    $anio     = isset($_GET['anio']) ? intval($_GET['anio']) : date('Y');
     $busqueda = sanear($_GET['busqueda'] ?? '');
-    
+    $etapa    = sanear($_GET['etapa']    ?? '');
+
     $filtros = [];
-    if ($estado) $filtros['estado'] = $estado;
-    if ($mes) $filtros['mes'] = $mes;
-    if ($anio) $filtros['anio'] = $anio;
+    if ($estado)   $filtros['estado']   = $estado;
+    if ($mes)      $filtros['mes']      = $mes;
+    if ($anio)     $filtros['anio']     = $anio;
     if ($busqueda) $filtros['busqueda'] = $busqueda;
+    if ($etapa)    $filtros['etapa']    = $etapa;
     
     $resultado = $modelo_pago->obtenerConFiltros($filtros, $pagina, 15);
     $pagos = $resultado['datos'];

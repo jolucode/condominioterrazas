@@ -118,6 +118,12 @@ function listarMembresias() {
                     <option value="activo">Con cuotas pendientes</option>
                     <option value="completo">Plan completado</option>
                 </select>
+                <select id="etapa-select" class="form-control">
+                    <option value="">Todas las etapas</option>
+                    <?php foreach ((new Cliente())->obtenerEtapas() as $et): ?>
+                        <option value="<?php echo htmlspecialchars($et); ?>"><?php echo htmlspecialchars($et); ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <input type="hidden" id="base-url" value="<?php echo APP_URL; ?>">
             </div>
 
@@ -190,6 +196,7 @@ function listarMembresias() {
     (function() {
         const busqueda  = document.getElementById('busqueda-input');
         const filtro    = document.getElementById('filtro-estado');
+        const etapa     = document.getElementById('etapa-select');
         const container = document.getElementById('membresia-table-container');
         const baseUrl   = document.getElementById('base-url').value;
         let timer;
@@ -198,13 +205,15 @@ function listarMembresias() {
             const url = `${baseUrl}/controllers/membresia_controller.php?accion=listar_ajax`
                 + `&pagina=${pagina}`
                 + `&busqueda=${encodeURIComponent(busqueda.value)}`
-                + `&filtro=${encodeURIComponent(filtro.value)}`;
+                + `&filtro=${encodeURIComponent(filtro.value)}`
+                + `&etapa=${encodeURIComponent(etapa.value)}`;
             container.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
             fetch(url).then(r => r.text()).then(html => { container.innerHTML = html; });
         }
 
         busqueda.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => cargar(1), 400); });
         filtro.addEventListener('change', () => cargar(1));
+        etapa.addEventListener('change',  () => cargar(1));
 
         container.addEventListener('click', e => {
             const a = e.target.closest('.pagination a');
@@ -232,17 +241,20 @@ function listarMembresias() {
 }
 
 // ─────────────────────────────────────────────────────
-function renderTablaMembresias($pagina = 1, $busqueda = '', $filtro_estado = '') {
+function renderTablaMembresias($pagina = 1, $busqueda = '', $filtro_estado = '', $etapa_filtro = '') {
     $db      = Database::getInstance()->getConnection();
     $por_pag = 15;
 
-    $having  = [];
     $where   = "WHERE p.tipo_pago = 'membresia_cuota'";
     $params  = [];
 
     if ($busqueda) {
         $where .= " AND (c.nombres LIKE :b1 OR c.apellidos LIKE :b2 OR c.dni LIKE :b3 OR c.numero_lote LIKE :b4)";
         $params[':b1'] = $params[':b2'] = $params[':b3'] = $params[':b4'] = "%{$busqueda}%";
+    }
+    if ($etapa_filtro) {
+        $where .= " AND c.etapa = :etapa";
+        $params[':etapa'] = $etapa_filtro;
     }
 
     $havingSQL = '';
@@ -394,8 +406,9 @@ function listarMembresiasAjax() {
     $pagina   = intval($_GET['pagina']   ?? 1);
     $busqueda = sanear($_GET['busqueda'] ?? '');
     $filtro   = sanear($_GET['filtro']   ?? '');
+    $etapa    = sanear($_GET['etapa']    ?? '');
     ob_start();
-    renderTablaMembresias($pagina, $busqueda, $filtro);
+    renderTablaMembresias($pagina, $busqueda, $filtro, $etapa);
     echo ob_get_clean();
     exit;
 }

@@ -127,6 +127,12 @@ function listarInscripciones() {
                     <option value="pagado">Pagado</option>
                     <option value="vencido">Vencido</option>
                 </select>
+                <select id="etapa-select" class="form-control">
+                    <option value="">Todas las etapas</option>
+                    <?php foreach ((new Cliente())->obtenerEtapas() as $et): ?>
+                        <option value="<?php echo htmlspecialchars($et); ?>"><?php echo htmlspecialchars($et); ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <input type="hidden" id="base-url" value="<?php echo APP_URL; ?>">
             </div>
 
@@ -138,23 +144,26 @@ function listarInscripciones() {
 
     <script>
     (function() {
-        const busqueda = document.getElementById('busqueda-input');
-        const estado   = document.getElementById('estado-select');
+        const busqueda  = document.getElementById('busqueda-input');
+        const estado    = document.getElementById('estado-select');
+        const etapa     = document.getElementById('etapa-select');
         const container = document.getElementById('inscripciones-table-container');
-        const baseUrl  = document.getElementById('base-url').value;
+        const baseUrl   = document.getElementById('base-url').value;
         let timer;
 
         function cargar(pagina = 1) {
             const url = `${baseUrl}/controllers/inscripcion_controller.php?accion=listar_ajax`
                 + `&pagina=${pagina}`
                 + `&busqueda=${encodeURIComponent(busqueda.value)}`
-                + `&estado=${encodeURIComponent(estado.value)}`;
+                + `&estado=${encodeURIComponent(estado.value)}`
+                + `&etapa=${encodeURIComponent(etapa.value)}`;
             container.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
             fetch(url).then(r => r.text()).then(html => { container.innerHTML = html; });
         }
 
         busqueda.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => cargar(1), 400); });
         estado.addEventListener('change', () => cargar(1));
+        etapa.addEventListener('change',  () => cargar(1));
 
         container.addEventListener('click', e => {
             const a = e.target.closest('.pagination a');
@@ -169,22 +178,23 @@ function listarInscripciones() {
 }
 
 // ─────────────────────────────────────────────
-function renderTablaInscripciones($pagina = 1, $busqueda = '', $estado_filtro = '') {
+function renderTablaInscripciones($pagina = 1, $busqueda = '', $estado_filtro = '', $etapa_filtro = '') {
     $db       = Database::getInstance()->getConnection();
     $por_pag  = 15;
     $where    = ["p.tipo_pago = 'inscripcion'"];
     $params   = [];
 
     if ($busqueda) {
-        $where[]          = "(c.nombres LIKE :b1 OR c.apellidos LIKE :b2 OR c.dni LIKE :b3 OR c.numero_lote LIKE :b4)";
-        $params[':b1']    = "%{$busqueda}%";
-        $params[':b2']    = "%{$busqueda}%";
-        $params[':b3']    = "%{$busqueda}%";
-        $params[':b4']    = "%{$busqueda}%";
+        $where[]       = "(c.nombres LIKE :b1 OR c.apellidos LIKE :b2 OR c.dni LIKE :b3 OR c.numero_lote LIKE :b4)";
+        $params[':b1'] = $params[':b2'] = $params[':b3'] = $params[':b4'] = "%{$busqueda}%";
     }
     if ($estado_filtro) {
-        $where[]          = "p.estado = :estado";
+        $where[]           = "p.estado = :estado";
         $params[':estado'] = $estado_filtro;
+    }
+    if ($etapa_filtro) {
+        $where[]          = "c.etapa = :etapa";
+        $params[':etapa'] = $etapa_filtro;
     }
 
     $whereSQL = 'WHERE ' . implode(' AND ', $where);
@@ -306,8 +316,9 @@ function listarInscripcionesAjax() {
     $pagina   = intval($_GET['pagina']   ?? 1);
     $busqueda = sanear($_GET['busqueda'] ?? '');
     $estado   = sanear($_GET['estado']   ?? '');
+    $etapa    = sanear($_GET['etapa']    ?? '');
     ob_start();
-    renderTablaInscripciones($pagina, $busqueda, $estado);
+    renderTablaInscripciones($pagina, $busqueda, $estado, $etapa);
     echo ob_get_clean();
     exit;
 }

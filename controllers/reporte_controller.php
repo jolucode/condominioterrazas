@@ -192,38 +192,51 @@ function reporteClientes() {
 }
 
 function reportePagosPorMes() {
-    $anio = intval($_GET['anio'] ?? date('Y'));
-    
-    $db = Database::getInstance()->getConnection();
-    $sql = "SELECT 
-                p.mes,
-                p.anio,
+    $anio  = intval($_GET['anio']  ?? date('Y'));
+    $etapa = sanear($_GET['etapa'] ?? '');
+
+    $db     = Database::getInstance()->getConnection();
+    $where  = "WHERE p.anio = :anio AND p.tipo_pago = 'mantenimiento'";
+    $params = [':anio' => $anio];
+
+    if ($etapa) {
+        $where .= " AND c.etapa = :etapa";
+        $params[':etapa'] = $etapa;
+    }
+
+    $sql = "SELECT
+                p.mes, p.anio,
                 COUNT(*) as total,
-                SUM(CASE WHEN p.estado = 'pagado' THEN 1 ELSE 0 END) as pagados,
+                SUM(CASE WHEN p.estado = 'pagado'    THEN 1 ELSE 0 END) as pagados,
                 SUM(CASE WHEN p.estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-                SUM(CASE WHEN p.estado = 'vencido' THEN 1 ELSE 0 END) as vencidos,
-                SUM(CASE WHEN p.estado = 'pagado' THEN p.monto ELSE 0 END) as total_recaudado
+                SUM(CASE WHEN p.estado = 'vencido'   THEN 1 ELSE 0 END) as vencidos,
+                SUM(CASE WHEN p.estado = 'pagado'    THEN p.monto ELSE 0 END) as total_recaudado
             FROM pagos p
-            WHERE p.anio = :anio
+            INNER JOIN clientes c ON p.cliente_id = c.id
+            {$where}
             GROUP BY p.mes, p.anio
             ORDER BY p.mes";
     $stmt = $db->prepare($sql);
-    $stmt->execute([':anio' => $anio]);
+    $stmt->execute($params);
     $datos = $stmt->fetchAll();
-    
+
+    // Etapas para el select
+    $etapas = (new Cliente())->obtenerEtapas();
+
     $formato = $_GET['formato'] ?? 'excel';
-    
+
     if ($formato === 'excel') {
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="reporte_pagos_mes_' . $anio . '.csv"');
-        
+        header('Content-Disposition: attachment; filename="reporte_pagos_mes_' . $anio . ($etapa ? '_' . $etapa : '') . '.csv"');
+
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Mes', 'Año', 'Total', 'Pagados', 'Pendientes', 'Vencidos', 'Total Recaudado'], ';');
-        
+        fputcsv($output, ['Mes', 'Año', 'Etapa', 'Total', 'Pagados', 'Pendientes', 'Vencidos', 'Total Recaudado'], ';');
+
         foreach ($datos as $row) {
             fputcsv($output, [
                 nombreMes($row['mes']),
                 $row['anio'],
+                $etapa ?: 'Todas',
                 $row['total'],
                 $row['pagados'],
                 $row['pendientes'],
@@ -234,18 +247,32 @@ function reportePagosPorMes() {
         fclose($output);
         exit;
     }
-    
-    $titulo = 'Reporte de Pagos por Mes';
-    $subtitulo = 'Año ' . $anio;
+
+    $titulo      = 'Reporte de Pagos por Mes';
+    $subtitulo   = 'Año ' . $anio . ($etapa ? ' — ' . $etapa : '');
     $pagina_actual = 'reportes';
-    
+
     ob_start();
     ?>
     <div class="card">
         <div class="card-header">
-            <h3>Pagos por Mes - <?php echo $anio; ?></h3>
+            <h3>Pagos por Mes - <?php echo $anio; ?><?php echo $etapa ? ' — ' . htmlspecialchars($etapa) : ''; ?></h3>
             <div class="d-flex gap-1">
-                <a href="?accion=pagos_mes&anio=<?php echo $anio; ?>&formato=excel" class="btn btn-success btn-sm">
+                <form method="GET" style="display:flex;gap:.5rem;align-items:center;">
+                    <input type="hidden" name="accion" value="pagos_mes">
+                    <select name="anio" class="form-control" style="width:auto;" onchange="this.form.submit()">
+                        <?php for ($a = date('Y'); $a >= date('Y') - 3; $a--): ?>
+                            <option value="<?php echo $a; ?>" <?php echo $a === $anio ? 'selected' : ''; ?>><?php echo $a; ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <select name="etapa" class="form-control" style="width:auto;" onchange="this.form.submit()">
+                        <option value="">Todas las etapas</option>
+                        <?php foreach ($etapas as $et): ?>
+                            <option value="<?php echo htmlspecialchars($et); ?>" <?php echo $etapa === $et ? 'selected' : ''; ?>><?php echo htmlspecialchars($et); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+                <a href="?accion=pagos_mes&anio=<?php echo $anio; ?>&etapa=<?php echo urlencode($etapa); ?>&formato=excel" class="btn btn-success btn-sm">
                     <i class="fas fa-file-excel"></i> Excel
                 </a>
                 <button onclick="window.print()" class="btn btn-outline btn-sm">
@@ -288,31 +315,52 @@ function reportePagosPorMes() {
 }
 
 function reportePagosPendientes() {
-    $db = Database::getInstance()->getConnection();
-    $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre, c.dni, c.numero_lote
+    $etapa  = sanear($_GET['etapa'] ?? '');
+    $tipo   = sanear($_GET['tipo_pago'] ?? 'mantenimiento');
+    $etapas = (new Cliente())->obtenerEtapas();
+
+    $db     = Database::getInstance()->getConnection();
+    $where  = "WHERE p.estado IN ('pendiente', 'vencido') AND p.tipo_pago = :tipo_pago";
+    $params = [':tipo_pago' => $tipo];
+
+    if ($etapa) {
+        $where .= " AND c.etapa = :etapa";
+        $params[':etapa'] = $etapa;
+    }
+
+    $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                   c.dni, c.numero_lote, c.manzana, c.etapa as cliente_etapa, c.telefono
             FROM pagos p
             INNER JOIN clientes c ON p.cliente_id = c.id
-            WHERE p.estado IN ('pendiente', 'vencido')
-            ORDER BY p.fecha_vencimiento ASC";
-    $stmt = $db->query($sql);
+            {$where}
+            ORDER BY c.etapa ASC, p.fecha_vencimiento ASC";
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
     $pagos = $stmt->fetchAll();
-    
+
     $formato = $_GET['formato'] ?? 'excel';
-    
+
     if ($formato === 'excel') {
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="reporte_pagos_pendientes_' . date('Y-m-d') . '.csv"');
-        
+        $fname = 'reporte_pendientes_' . $tipo . ($etapa ? '_' . $etapa : '') . '_' . date('Y-m-d') . '.csv';
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['Cliente', 'DNI', 'Lote', 'Mes', 'Año', 'Monto', 'Vencimiento', 'Estado'], ';');
-        
+        fputcsv($output, ['Etapa', 'Cliente', 'DNI', 'Lote', 'Manzana', 'Tipo Pago', 'Concepto', 'Monto', 'Vencimiento', 'Estado'], ';');
+
         foreach ($pagos as $pago) {
+            $concepto = $pago['tipo_pago'] === 'mantenimiento'
+                ? nombreMes($pago['mes']) . ' ' . $pago['anio']
+                : ($pago['tipo_pago'] === 'inscripcion' ? 'Inscripción' : 'Membresía cuota ' . $pago['cuota_numero']);
+
             fputcsv($output, [
+                $pago['cliente_etapa'] ?: '-',
                 $pago['cliente_nombre'],
                 $pago['dni'],
                 $pago['numero_lote'],
-                nombreMes($pago['mes']),
-                $pago['anio'],
+                $pago['manzana'] ?: '-',
+                ucfirst(str_replace('_', ' ', $pago['tipo_pago'])),
+                $concepto,
                 $pago['monto'],
                 formatearFecha($pago['fecha_vencimiento'], 'd/m/Y'),
                 textoEstadoPago($pago['estado'])
@@ -321,18 +369,35 @@ function reportePagosPendientes() {
         fclose($output);
         exit;
     }
-    
-    $titulo = 'Reporte de Pagos Pendientes';
-    $subtitulo = count($pagos) . ' pagos pendientes';
+
+    $titulo      = 'Reporte de Pagos Pendientes';
+    $subtitulo   = count($pagos) . ' registros' . ($etapa ? ' — ' . $etapa : '');
     $pagina_actual = 'reportes';
-    
+
     ob_start();
     ?>
     <div class="card">
         <div class="card-header">
             <h3>Pagos Pendientes</h3>
-            <div class="d-flex gap-1">
-                <a href="?accion=pagos_pendientes&formato=excel" class="btn btn-success btn-sm">
+            <div class="d-flex gap-1" style="flex-wrap:wrap;gap:.5rem;">
+                <form method="GET" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                    <input type="hidden" name="accion" value="pagos_pendientes">
+                    <select name="tipo_pago" class="form-control" style="width:auto;" onchange="this.form.submit()">
+                        <option value="mantenimiento" <?php echo $tipo==='mantenimiento'?'selected':''; ?>>Mantenimiento</option>
+                        <option value="inscripcion"   <?php echo $tipo==='inscripcion'?'selected':''; ?>>Inscripción</option>
+                        <option value="membresia_cuota" <?php echo $tipo==='membresia_cuota'?'selected':''; ?>>Membresía</option>
+                    </select>
+                    <select name="etapa" class="form-control" style="width:auto;" onchange="this.form.submit()">
+                        <option value="">Todas las etapas</option>
+                        <?php foreach ($etapas as $et): ?>
+                            <option value="<?php echo htmlspecialchars($et); ?>" <?php echo $etapa===$et?'selected':''; ?>>
+                                <?php echo htmlspecialchars($et); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+                <a href="?accion=pagos_pendientes&etapa=<?php echo urlencode($etapa); ?>&tipo_pago=<?php echo urlencode($tipo); ?>&formato=excel"
+                   class="btn btn-success btn-sm">
                     <i class="fas fa-file-excel"></i> Excel
                 </a>
                 <button onclick="window.print()" class="btn btn-outline btn-sm">
@@ -346,22 +411,28 @@ function reportePagosPendientes() {
                     <table class="table">
                         <thead>
                             <tr>
+                                <th>Etapa</th>
                                 <th>Cliente</th>
                                 <th>DNI</th>
-                                <th>Lote</th>
-                                <th>Mes/Año</th>
+                                <th>Lote / Mz</th>
+                                <th>Concepto</th>
                                 <th>Monto</th>
                                 <th>Vencimiento</th>
                                 <th>Estado</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($pagos as $pago): ?>
+                            <?php foreach ($pagos as $pago):
+                                $concepto = $pago['tipo_pago'] === 'mantenimiento'
+                                    ? nombreMes($pago['mes']) . ' ' . $pago['anio']
+                                    : ($pago['tipo_pago'] === 'inscripcion' ? 'Inscripción' : 'Membresía cuota ' . $pago['cuota_numero']);
+                            ?>
                                 <tr>
+                                    <td><?php echo htmlspecialchars($pago['cliente_etapa'] ?: '-'); ?></td>
                                     <td><?php echo $pago['cliente_nombre']; ?></td>
                                     <td><?php echo $pago['dni']; ?></td>
-                                    <td><?php echo $pago['numero_lote']; ?></td>
-                                    <td><?php echo nombreMes($pago['mes']) . ' ' . $pago['anio']; ?></td>
+                                    <td><?php echo $pago['numero_lote']; ?><?php echo $pago['manzana'] ? ' / Mz '.$pago['manzana'] : ''; ?></td>
+                                    <td><?php echo $concepto; ?></td>
                                     <td><?php echo formatearMoneda($pago['monto']); ?></td>
                                     <td><?php echo formatearFecha($pago['fecha_vencimiento']); ?></td>
                                     <td><span class="badge <?php echo claseEstadoPago($pago['estado']); ?>"><?php echo textoEstadoPago($pago['estado']); ?></span></td>
@@ -373,8 +444,8 @@ function reportePagosPendientes() {
             <?php else: ?>
                 <div class="empty-state">
                     <i class="fas fa-check-circle"></i>
-                    <h3>¡Excelente!</h3>
-                    <p>No hay pagos pendientes</p>
+                    <h3>¡Sin pendientes!</h3>
+                    <p>No hay pagos pendientes con los filtros seleccionados</p>
                 </div>
             <?php endif; ?>
         </div>
