@@ -213,10 +213,13 @@ class Pago extends ModeloBase {
     }
     
     /**
-     * Últimos pagos registrados
+     * Últimos pagos registrados (todos los tipos)
      */
     public function ultimosPagos($limite = 10) {
-        $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre, c.numero_lote
+        $sql = "SELECT p.id, p.tipo_pago, p.mes, p.anio, p.cuota_numero,
+                       p.monto, p.estado, p.fecha_creacion, p.fecha_pago,
+                       CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
+                       c.numero_lote
                 FROM {$this->tabla} p
                 INNER JOIN clientes c ON p.cliente_id = c.id
                 ORDER BY p.fecha_creacion DESC

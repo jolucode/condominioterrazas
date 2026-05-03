@@ -20,23 +20,48 @@ $modelo_reunion = new Reunion();
 $stats_clientes = $modelo_cliente->estadisticas();
 
 // Mes y año actual
-$mes_actual = date('n');
+$mes_actual  = date('n');
 $anio_actual = date('Y');
 
-// Estadísticas de pagos del mes
+// Estadísticas de mantenimiento del mes
 $stats_pagos = $modelo_pago->estadisticas($mes_actual, $anio_actual);
+
+// Stats de inscripciones y membresía (globales)
+$stats_insc = $db->query(
+    "SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN estado='pagado'  THEN 1 ELSE 0 END) as pagadas,
+        SUM(CASE WHEN estado!='pagado' THEN 1 ELSE 0 END) as pendientes,
+        SUM(CASE WHEN estado='pagado'  THEN monto ELSE 0 END) as recaudado,
+        SUM(CASE WHEN estado!='pagado' THEN monto ELSE 0 END) as por_cobrar
+     FROM pagos WHERE tipo_pago='inscripcion'"
+)->fetch();
+
+$stats_memb = $db->query(
+    "SELECT
+        COUNT(DISTINCT cliente_id) as clientes,
+        SUM(CASE WHEN estado='pagado'  THEN monto ELSE 0 END) as recaudado,
+        SUM(CASE WHEN estado!='pagado' THEN monto ELSE 0 END) as por_cobrar
+     FROM pagos WHERE tipo_pago='membresia_cuota'"
+)->fetch();
+
+// Deuda global consolidada
+$deuda_global = $db->query(
+    "SELECT SUM(CASE WHEN estado!='pagado' THEN monto ELSE 0 END) as total_deuda
+     FROM pagos WHERE tipo_pago IN ('mantenimiento','inscripcion','membresia_cuota')"
+)->fetch()['total_deuda'];
 
 // Próxima reunión
 $proxima_reunion = $modelo_reunion->obtenerProxima();
 
-// Últimos pagos
-$ultimos_pagos = $modelo_pago->ultimosPagos(10);
+// Últimos pagos (todos los tipos)
+$ultimos_pagos = $modelo_pago->ultimosPagos(8);
 
 // Acuerdos pendientes
-$modelo_acuerdo = new Acuerdo();
+$modelo_acuerdo      = new Acuerdo();
 $acuerdos_pendientes = $modelo_acuerdo->obtenerPendientes();
 
-// Datos para gráfico de pagos del año
+// Datos para gráfico de pagos del año (mantenimiento)
 $pagos_por_mes = $modelo_pago->pagosPorMes($anio_actual);
 
 // Preparar datos para el gráfico
@@ -72,54 +97,117 @@ ob_start();
 <!-- Estadísticas principales -->
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-icon blue">
-            <i class="fas fa-users"></i>
-        </div>
+        <div class="stat-icon blue"><i class="fas fa-users"></i></div>
         <div class="stat-info">
-            <div class="label">Total Clientes</div>
+            <div class="label">Propietarios Activos</div>
             <div class="value"><?php echo $stats_clientes['activos']; ?></div>
-            <div class="change positive">
-                <i class="fas fa-check-circle"></i> Activos
-            </div>
+            <div class="change positive"><i class="fas fa-check-circle"></i> Activos</div>
         </div>
     </div>
-    
     <div class="stat-card">
-        <div class="stat-icon green">
-            <i class="fas fa-check-circle"></i>
-        </div>
+        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
         <div class="stat-info">
-            <div class="label">Pagados este Mes</div>
+            <div class="label">Mant. Pagado (<?php echo nombreMes($mes_actual); ?>)</div>
             <div class="value"><?php echo $stats_pagos['pagados']; ?></div>
-            <div class="change positive">
-                <?php echo formatearMoneda($stats_pagos['total_recaudado']); ?> recaudado
-            </div>
+            <div class="change positive"><?php echo formatearMoneda($stats_pagos['total_recaudado']); ?></div>
         </div>
     </div>
-    
     <div class="stat-card">
-        <div class="stat-icon yellow">
-            <i class="fas fa-clock"></i>
-        </div>
+        <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
         <div class="stat-info">
-            <div class="label">Pendientes</div>
-            <div class="value"><?php echo $stats_pagos['pendientes']; ?></div>
-            <div class="change">
-                Por cobrar este mes
-            </div>
+            <div class="label">Mant. Pendiente (<?php echo nombreMes($mes_actual); ?>)</div>
+            <div class="value"><?php echo $stats_pagos['pendientes'] + $stats_pagos['vencidos']; ?></div>
+            <div class="change negative"><?php echo formatearMoneda($stats_pagos['total_pendiente'] + $stats_pagos['total_vencido']); ?> por cobrar</div>
         </div>
     </div>
-    
     <div class="stat-card">
-        <div class="stat-icon red">
-            <i class="fas fa-exclamation-triangle"></i>
-        </div>
+        <div class="stat-icon red"><i class="fas fa-exclamation-circle"></i></div>
         <div class="stat-info">
-            <div class="label">Vencidos</div>
-            <div class="value"><?php echo $stats_pagos['vencidos']; ?></div>
-            <div class="change negative">
-                <?php echo formatearMoneda($stats_pagos['total_vencido']); ?> vencido
-            </div>
+            <div class="label">Deuda Global Total</div>
+            <div class="value" style="font-size:1.1rem;"><?php echo formatearMoneda($deuda_global); ?></div>
+            <div class="change negative">3 tipos de pago</div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen de recaudación por tipo -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3><i class="fas fa-chart-pie"></i> Recaudación por Tipo de Pago</h3>
+        <a href="<?php echo APP_URL; ?>/controllers/reporte_controller.php?accion=deuda_consolidada"
+           class="btn btn-outline btn-sm">
+            <i class="fas fa-exclamation-circle"></i> Ver deudas
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Tipo de Pago</th>
+                        <th style="text-align:right">Recaudado</th>
+                        <th style="text-align:right">Por Cobrar</th>
+                        <th style="text-align:right">% Cobrado</th>
+                        <th>Acceso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $mant_total = $stats_pagos['total_recaudado'] + $stats_pagos['total_pendiente'] + $stats_pagos['total_vencido'];
+                    $mant_pct   = $mant_total > 0 ? round(($stats_pagos['total_recaudado'] / $mant_total) * 100) : 0;
+                    $insc_total = $stats_insc['recaudado'] + $stats_insc['por_cobrar'];
+                    $insc_pct   = $insc_total > 0 ? round(($stats_insc['recaudado'] / $insc_total) * 100) : 0;
+                    $memb_total = $stats_memb['recaudado'] + $stats_memb['por_cobrar'];
+                    $memb_pct   = $memb_total > 0 ? round(($stats_memb['recaudado'] / $memb_total) * 100) : 0;
+                    ?>
+                    <tr>
+                        <td><i class="fas fa-money-bill-wave" style="color:var(--color-primario)"></i> <strong>Mantenimiento</strong></td>
+                        <td style="text-align:right;color:var(--color-exito);font-weight:600;"><?php echo formatearMoneda($stats_pagos['total_recaudado']); ?></td>
+                        <td style="text-align:right;color:var(--color-peligro);"><?php echo formatearMoneda($stats_pagos['total_pendiente'] + $stats_pagos['total_vencido']); ?></td>
+                        <td style="text-align:right;">
+                            <div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end;">
+                                <div style="width:60px;background:var(--color-borde);border-radius:4px;height:6px;overflow:hidden;">
+                                    <div style="width:<?php echo $mant_pct; ?>%;background:var(--color-exito);height:100%;"></div>
+                                </div>
+                                <span><?php echo $mant_pct; ?>%</span>
+                            </div>
+                        </td>
+                        <td><a href="<?php echo APP_URL; ?>/controllers/pago_controller.php?accion=listar" class="btn btn-sm btn-outline">Ver</a></td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-file-signature" style="color:var(--color-info)"></i> <strong>Inscripción</strong>
+                            <small style="color:var(--color-texto-claro)"> (<?php echo $stats_insc['pagadas']; ?>/<?php echo $stats_insc['total']; ?> propietarios)</small>
+                        </td>
+                        <td style="text-align:right;color:var(--color-exito);font-weight:600;"><?php echo formatearMoneda($stats_insc['recaudado']); ?></td>
+                        <td style="text-align:right;color:var(--color-peligro);"><?php echo formatearMoneda($stats_insc['por_cobrar']); ?></td>
+                        <td style="text-align:right;">
+                            <div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end;">
+                                <div style="width:60px;background:var(--color-borde);border-radius:4px;height:6px;overflow:hidden;">
+                                    <div style="width:<?php echo $insc_pct; ?>%;background:var(--color-exito);height:100%;"></div>
+                                </div>
+                                <span><?php echo $insc_pct; ?>%</span>
+                            </div>
+                        </td>
+                        <td><a href="<?php echo APP_URL; ?>/controllers/inscripcion_controller.php?accion=listar" class="btn btn-sm btn-outline">Ver</a></td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-id-card" style="color:var(--color-advertencia)"></i> <strong>Membresía Club</strong>
+                            <small style="color:var(--color-texto-claro)"> (<?php echo $stats_memb['clientes']; ?> enrolados)</small>
+                        </td>
+                        <td style="text-align:right;color:var(--color-exito);font-weight:600;"><?php echo formatearMoneda($stats_memb['recaudado']); ?></td>
+                        <td style="text-align:right;color:var(--color-peligro);"><?php echo formatearMoneda($stats_memb['por_cobrar']); ?></td>
+                        <td style="text-align:right;">
+                            <div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end;">
+                                <div style="width:60px;background:var(--color-borde);border-radius:4px;height:6px;overflow:hidden;">
+                                    <div style="width:<?php echo $memb_pct; ?>%;background:var(--color-exito);height:100%;"></div>
+                                </div>
+                                <span><?php echo $memb_pct; ?>%</span>
+                            </div>
+                        </td>
+                        <td><a href="<?php echo APP_URL; ?>/controllers/membresia_controller.php?accion=listar" class="btn btn-sm btn-outline">Ver</a></td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -259,25 +347,42 @@ ob_start();
                         <tr>
                             <th>Cliente</th>
                             <th>Lote</th>
-                            <th>Mes/Año</th>
+                            <th>Tipo</th>
+                            <th>Concepto</th>
                             <th>Monto</th>
                             <th>Estado</th>
-                            <th>Fecha Pago</th>
+                            <th>Fecha Registro</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($ultimos_pagos as $pago): ?>
+                        <?php foreach ($ultimos_pagos as $pago):
+                            // Determinar icono y concepto según tipo
+                            $iconos = [
+                                'mantenimiento'   => '<i class="fas fa-money-bill-wave" style="color:var(--color-primario)"></i>',
+                                'inscripcion'     => '<i class="fas fa-file-signature" style="color:var(--color-info)"></i>',
+                                'membresia_cuota' => '<i class="fas fa-id-card" style="color:var(--color-advertencia)"></i>',
+                            ];
+                            $tipo_icon = $iconos[$pago['tipo_pago']] ?? '';
+                            if ($pago['tipo_pago'] === 'mantenimiento') {
+                                $concepto = nombreMes($pago['mes']) . ' ' . $pago['anio'];
+                            } elseif ($pago['tipo_pago'] === 'inscripcion') {
+                                $concepto = 'Inscripción';
+                            } else {
+                                $concepto = 'Membresía cuota ' . ($pago['cuota_numero'] ?? '?');
+                            }
+                        ?>
                             <tr>
                                 <td><?php echo $pago['cliente_nombre']; ?></td>
                                 <td><?php echo $pago['numero_lote']; ?></td>
-                                <td><?php echo nombreMes($pago['mes']) . ' ' . $pago['anio']; ?></td>
+                                <td><?php echo $tipo_icon; ?></td>
+                                <td><?php echo $concepto; ?></td>
                                 <td><?php echo formatearMoneda($pago['monto']); ?></td>
                                 <td>
                                     <span class="badge <?php echo claseEstadoPago($pago['estado']); ?>">
                                         <?php echo textoEstadoPago($pago['estado']); ?>
                                     </span>
                                 </td>
-                                <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo formatearFecha($pago['fecha_creacion'], 'd/m/Y H:i'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
