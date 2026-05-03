@@ -79,9 +79,16 @@ function listarClientes() {
                 <h3>Listado de Clientes</h3>
                 <span class="badge badge-info"><?php echo $paginacion['total_registros']; ?> registros</span>
             </div>
-            <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=crear" class="btn btn-primary btn-sm">
-                <i class="fas fa-plus"></i> Nuevo Cliente
-            </a>
+            <div class="d-flex gap-1">
+                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=crear"
+                   class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Nuevo Cliente
+                </a>
+                <a href="<?php echo APP_URL; ?>/controllers/importar_controller.php"
+                   class="btn btn-outline btn-sm">
+                    <i class="fas fa-file-excel"></i> Importar Excel
+                </a>
+            </div>
         </div>
         
         <div class="card-body">
@@ -113,6 +120,8 @@ function listarClientes() {
                                 <th>Nombres y Apellidos</th>
                                 <th>DNI</th>
                                 <th>Teléfono</th>
+                                <th>Etapa</th>
+                                <th>Manzana</th>
                                 <th>Lote</th>
                                 <th>Correo</th>
                                 <th>Estado</th>
@@ -126,6 +135,8 @@ function listarClientes() {
                                     <td><?php echo $cliente['nombres'] . ' ' . $cliente['apellidos']; ?></td>
                                     <td><?php echo $cliente['dni']; ?></td>
                                     <td><?php echo $cliente['telefono'] ?: '-'; ?></td>
+                                    <td><?php echo $cliente['etapa'] ?: '-'; ?></td>
+                                    <td><?php echo $cliente['manzana'] ?: '-'; ?></td>
                                     <td><?php echo $cliente['numero_lote']; ?></td>
                                     <td><?php echo $cliente['correo'] ?: '-'; ?></td>
                                     <td>
@@ -134,15 +145,15 @@ function listarClientes() {
                                         </span>
                                     </td>
                                     <td class="actions">
-                                        <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=ver&id=<?php echo $cliente['id']; ?>" 
+                                        <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=ver&id=<?php echo $cliente['id']; ?>"
                                            class="btn btn-outline btn-sm" title="Ver">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>" 
+                                        <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>"
                                            class="btn btn-outline btn-sm" title="Editar">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=eliminar&id=<?php echo $cliente['id']; ?>" 
+                                        <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=eliminar&id=<?php echo $cliente['id']; ?>"
                                            class="btn btn-sm btn-danger" title="Eliminar"
                                            data-confirm-delete="¿Está seguro de eliminar este cliente? Esta acción no se puede deshacer.">
                                             <i class="fas fa-trash"></i>
@@ -287,6 +298,8 @@ function listarClientesAjax() {
                         <th>Nombres y Apellidos</th>
                         <th>DNI</th>
                         <th>Teléfono</th>
+                        <th>Etapa</th>
+                        <th>Manzana</th>
                         <th>Lote</th>
                         <th>Correo</th>
                         <th>Estado</th>
@@ -300,23 +313,25 @@ function listarClientesAjax() {
                             <td><?php echo $cliente['nombres'] . ' ' . $cliente['apellidos']; ?></td>
                             <td><?php echo $cliente['dni']; ?></td>
                             <td><?php echo $cliente['telefono'] ?: '-'; ?></td>
+                            <td><?php echo $cliente['etapa']    ?: '-'; ?></td>
+                            <td><?php echo $cliente['manzana']  ?: '-'; ?></td>
                             <td><?php echo $cliente['numero_lote']; ?></td>
-                            <td><?php echo $cliente['correo'] ?: '-'; ?></td>
+                            <td><?php echo $cliente['correo']   ?: '-'; ?></td>
                             <td>
                                 <span class="badge <?php echo $cliente['estado'] === 'activo' ? 'badge-success' : 'badge-danger'; ?>">
                                     <?php echo ucfirst($cliente['estado']); ?>
                                 </span>
                             </td>
                             <td class="actions">
-                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=ver&id=<?php echo $cliente['id']; ?>" 
+                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=ver&id=<?php echo $cliente['id']; ?>"
                                    class="btn btn-outline btn-sm" title="Ver">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>" 
+                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=editar&id=<?php echo $cliente['id']; ?>"
                                    class="btn btn-outline btn-sm" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=eliminar&id=<?php echo $cliente['id']; ?>" 
+                                <a href="<?php echo APP_URL; ?>/controllers/cliente_controller.php?accion=eliminar&id=<?php echo $cliente['id']; ?>"
                                    class="btn btn-sm btn-danger" title="Eliminar"
                                    data-confirm-delete="¿Está seguro de eliminar este cliente?">
                                     <i class="fas fa-trash"></i>

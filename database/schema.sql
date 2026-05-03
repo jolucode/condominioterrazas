@@ -36,10 +36,10 @@ CREATE TABLE IF NOT EXISTS clientes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
-    dni VARCHAR(8) NOT NULL UNIQUE,
+    dni VARCHAR(8) NOT NULL,
     ruc VARCHAR(11) NULL,
     telefono VARCHAR(20) NULL,
-    correo VARCHAR(100) NULL UNIQUE,
+    correo VARCHAR(100) NULL,
     direccion VARCHAR(200) NULL,
     numero_lote VARCHAR(20) NOT NULL,
     manzana VARCHAR(10) NULL,
@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     INDEX idx_dni (dni),
     INDEX idx_estado (estado),
     INDEX idx_lote (numero_lote),
-    INDEX idx_nombre (nombres, apellidos)
+    INDEX idx_nombre (nombres, apellidos),
+    UNIQUE KEY uk_cliente_lote (numero_lote, manzana, etapa)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

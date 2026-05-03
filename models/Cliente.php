@@ -96,21 +96,59 @@ class Cliente extends ModeloBase {
     }
     
     /**
-     * Verificar si DNI ya existe
+     * Verificar si ya existe la combinación dni + lote + manzana + etapa
+     * (un mismo propietario puede tener varios lotes)
      */
-    public function dniExiste($dni, $excluir_id = null) {
-        $sql = "SELECT COUNT(*) as total FROM {$this->tabla} WHERE dni = :dni";
-        $params = [':dni' => $dni];
-        
+    public function dniExiste($dni, $excluir_id = null, $numero_lote = null, $manzana = null, $etapa = null) {
+        if ($numero_lote !== null) {
+            // Verificar combinación única
+            $sql = "SELECT COUNT(*) as total FROM {$this->tabla}
+                    WHERE dni = :dni AND numero_lote = :lote
+                    AND manzana <=> :manzana AND etapa <=> :etapa";
+            $params = [':dni' => $dni, ':lote' => $numero_lote,
+                       ':manzana' => $manzana, ':etapa' => $etapa];
+        } else {
+            // Compatibilidad: solo verifica DNI (para edición manual)
+            $sql = "SELECT COUNT(*) as total FROM {$this->tabla} WHERE dni = :dni";
+            $params = [':dni' => $dni];
+        }
+
         if ($excluir_id) {
             $sql .= " AND id != :id";
             $params[':id'] = $excluir_id;
         }
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        $resultado = $stmt->fetch();
-        return $resultado['total'] > 0;
+        return $stmt->fetch()['total'] > 0;
+    }
+
+    /**
+     * Verificar si un lote ya está registrado (independiente del propietario)
+     * Un lote físico (numero_lote + manzana + etapa) solo puede tener UN registro.
+     * El mismo propietario (dni) puede tener múltiples lotes distintos.
+     */
+    public function loteExiste($numero_lote, $manzana, $etapa, $excluir_id = null) {
+        $sql = "SELECT id FROM {$this->tabla}
+                WHERE numero_lote = :lote
+                AND manzana <=> :manzana
+                AND etapa   <=> :etapa
+                LIMIT 1";
+        $params = [':lote' => $numero_lote, ':manzana' => $manzana, ':etapa' => $etapa];
+
+        if ($excluir_id) {
+            $sql = "SELECT id FROM {$this->tabla}
+                    WHERE numero_lote = :lote
+                    AND manzana <=> :manzana
+                    AND etapa   <=> :etapa
+                    AND id != :excluir
+                    LIMIT 1";
+            $params[':excluir'] = $excluir_id;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch();
     }
     
     /**
