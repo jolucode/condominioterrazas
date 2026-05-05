@@ -319,22 +319,24 @@ function mostrarFormulario() {
                 const esNuevo      = row.estado === 'nuevo';
                 const esExiste     = row.estado === 'existe';
                 const esIncompleto = row.estado === 'incompleto';
+                const esDuplicado  = row.estado === 'duplicado';
 
                 if (esNuevo)      nuevos++;
                 if (esExiste)     existentes++;
-                if (esIncompleto) incompletos++;
+                if (esIncompleto || esDuplicado) incompletos++;
 
-                if (esIncompleto)  tr.style.background = 'rgba(211,47,47,.06)';
-                else if (esExiste) tr.style.background = 'rgba(255,193,7,.08)';
+                if (esIncompleto || esDuplicado) tr.style.background = 'rgba(211,47,47,.06)';
+                else if (esExiste)               tr.style.background = 'rgba(255,193,7,.08)';
 
-                const faltanStr = (row.faltantes && row.faltantes.length)
-                    ? `<br><small style="color:var(--color-peligro);">Falta: ${row.faltantes.map(f => esc(f)).join(', ')}</small>`
+                const motivo = (row.faltantes && row.faltantes.length)
+                    ? `<br><small style="color:var(--color-peligro);">${esDuplicado ? '' : 'Falta: '}${row.faltantes.map(f => esc(f)).join(', ')}</small>`
                     : '';
 
                 let badgeEstado;
-                if (esNuevo)      badgeEstado = '<span class="badge badge-success">Nuevo</span>';
-                else if (esExiste) badgeEstado = '<span class="badge badge-warning">Ya existe</span>';
-                else               badgeEstado = `<span class="badge badge-danger">Incompleto</span>${faltanStr}`;
+                if (esNuevo)           badgeEstado = '<span class="badge badge-success">Nuevo</span>';
+                else if (esExiste)     badgeEstado = '<span class="badge badge-warning">Ya existe</span>';
+                else if (esDuplicado)  badgeEstado = `<span class="badge badge-danger">Lote duplicado en Excel</span>${motivo}`;
+                else                   badgeEstado = `<span class="badge badge-danger">Incompleto</span>${motivo}`;
 
                 tr.innerHTML = `
                     <td>${i + 1}</td>
@@ -364,7 +366,7 @@ function mostrarFormulario() {
                 ${incompletos > 0 ? `
                 <div style="padding:.75rem 1.25rem;background:#ffebee;border-radius:var(--radio);display:flex;align-items:center;gap:.5rem;">
                     <i class="fas fa-exclamation-circle" style="color:var(--color-peligro);"></i>
-                    <span><strong>${incompletos}</strong> con campos faltantes (no se insertarán)</span>
+                    <span><strong>${incompletos}</strong> con error (campos faltantes o lote duplicado en Excel — no se insertarán)</span>
                 </div>` : ''}
             </div>`;
 
@@ -453,60 +455,61 @@ function previsualizar() {
         exit;
     }
 
-    $modelo  = new Cliente();
-    $filas   = [];
+    $modelo      = new Cliente();
+    $filas       = [];
+    $lotes_batch = []; // rastrea lotes ya vistos en este mismo Excel
 
     foreach ($body['rows'] as $row) {
-        $dni        = sanear($row['dni']         ?? '');
-        $nombres    = sanear($row['nombres']     ?? '');
-        $apellidos  = sanear($row['apellidos']   ?? '');
-        $telefono   = sanear($row['telefono']    ?? '');
-        $correo     = sanear($row['correo']      ?? '');
-        $etapa      = sanear($row['etapa']       ?? '');
-        $manzana    = sanear($row['manzana']     ?? '');
-        $lote       = sanear($row['numero_lote'] ?? '');
+        $dni       = sanear($row['dni']         ?? '');
+        $nombres   = sanear($row['nombres']     ?? '');
+        $apellidos = sanear($row['apellidos']   ?? '');
+        $telefono  = sanear($row['telefono']    ?? '');
+        $correo    = sanear($row['correo']      ?? '');
+        $etapa     = sanear($row['etapa']       ?? '');
+        $manzana   = sanear($row['manzana']     ?? '');
+        $lote      = sanear($row['numero_lote'] ?? '');
 
-        // Detectar campos faltantes
+        $base = [
+            'dni' => $dni, 'nombres' => $nombres, 'apellidos' => $apellidos,
+            'telefono' => $telefono, 'correo' => $correo,
+            'etapa' => $etapa, 'manzana' => $manzana, 'numero_lote' => $lote,
+        ];
+
+        // 1. Campos faltantes
         $faltantes = [];
-        if (empty($dni))      $faltantes[] = 'DNI';
-        if (empty($nombres))  $faltantes[] = 'Nombres';
-        if (empty($apellidos))$faltantes[] = 'Apellidos';
-        if (empty($telefono)) $faltantes[] = 'Teléfono';
-        if (empty($correo))   $faltantes[] = 'Correo';
-        if (empty($etapa))    $faltantes[] = 'Etapa';
-        if (empty($manzana))  $faltantes[] = 'Manzana';
-        if (empty($lote))     $faltantes[] = 'Lote';
+        if (empty($dni))       $faltantes[] = 'DNI';
+        if (empty($nombres))   $faltantes[] = 'Nombres';
+        if (empty($apellidos)) $faltantes[] = 'Apellidos';
+        if (empty($telefono))  $faltantes[] = 'Teléfono';
+        if (empty($correo))    $faltantes[] = 'Correo';
+        if (empty($etapa))     $faltantes[] = 'Etapa';
+        if (empty($manzana))   $faltantes[] = 'Manzana';
+        if (empty($lote))      $faltantes[] = 'Lote';
 
         if (!empty($faltantes)) {
-            $filas[] = [
-                'dni'         => $dni,
-                'nombres'     => $nombres,
-                'apellidos'   => $apellidos,
-                'telefono'    => $telefono,
-                'correo'      => $correo,
-                'etapa'       => $etapa,
-                'manzana'     => $manzana,
-                'numero_lote' => $lote,
-                'estado'      => 'incompleto',
-                'faltantes'   => $faltantes,
-            ];
+            $filas[] = array_merge($base, ['estado' => 'incompleto', 'faltantes' => $faltantes]);
             continue;
         }
 
-        $existe = $modelo->loteExiste($lote, $manzana, $etapa);
+        // 2. Duplicado dentro del mismo Excel
+        $clave = strtoupper("{$lote}|{$manzana}|{$etapa}");
+        if (isset($lotes_batch[$clave])) {
+            $filas[] = array_merge($base, [
+                'estado'    => 'duplicado',
+                'faltantes' => ["Lote {$lote} / Mz {$manzana} / Etapa {$etapa} ya está en la fila {$lotes_batch[$clave]} de este Excel"],
+            ]);
+            continue;
+        }
 
-        $filas[] = [
-            'dni'         => $dni,
-            'nombres'     => $nombres,
-            'apellidos'   => $apellidos,
-            'telefono'    => $telefono,
-            'correo'      => $correo,
-            'etapa'       => $etapa,
-            'manzana'     => $manzana,
-            'numero_lote' => $lote,
-            'estado'      => $existe ? 'existe' : 'nuevo',
-            'faltantes'   => [],
-        ];
+        // 3. Ya existe en la BD
+        $existe = $modelo->loteExiste($lote, $manzana, $etapa);
+        $fila_actual = count($filas) + 1;
+        $lotes_batch[$clave] = $fila_actual;
+
+        $filas[] = array_merge($base, [
+            'estado'    => $existe ? 'existe' : 'nuevo',
+            'faltantes' => [],
+        ]);
     }
 
     echo json_encode(['rows' => $filas]);
