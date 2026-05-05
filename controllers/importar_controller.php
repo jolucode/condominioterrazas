@@ -630,6 +630,19 @@ function importar() {
             if ($id) {
                 registrarAuditoria($db, 'create', 'clientes', $id,
                     "Importado: {$nombres} {$apellidos} — Lote {$lote} Mz {$manzana} Etapa {$etapa}");
+
+                // Crear usuario de acceso: correo como usuario, DNI como contraseña
+                $modelo_usuario = new Usuario();
+                if (!$modelo_usuario->correoExiste($correo)) {
+                    $modelo_usuario->crearUsuario([
+                        'nombre_completo' => $nombres . ' ' . $apellidos,
+                        'correo'          => $correo,
+                        'password'        => $dni,
+                        'rol'             => 'cliente',
+                        'cliente_id'      => $id,
+                    ]);
+                }
+
                 $insertados++;
             } else {
                 $errores++;

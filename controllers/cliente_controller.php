@@ -398,23 +398,15 @@ function crearCliente() {
         $manzana = sanear($_POST['manzana'] ?? '');
         $etapa = sanear($_POST['etapa'] ?? '');
         $estado = sanear($_POST['estado'] ?? 'activo');
-        $crear_usuario = isset($_POST['crear_usuario']);
-        $password_usuario = $_POST['password_usuario'] ?? '';
-        
+
         // Validaciones
-        if (empty($nombres)) $errores[] = 'El nombre es requerido';
-        if (empty($apellidos)) $errores[] = 'El apellido es requerido';
-        if (empty($dni)) $errores[] = 'El DNI es requerido';
+        if (empty($nombres))    $errores[] = 'El nombre es requerido';
+        if (empty($apellidos))  $errores[] = 'El apellido es requerido';
+        if (empty($dni))        $errores[] = 'El DNI es requerido';
         elseif (!esDNIVálido($dni)) $errores[] = 'El DNI debe tener 8 dígitos';
-        elseif ($modelo_cliente->dniExiste($dni)) $errores[] = 'El DNI ya está registrado';
         if (empty($numero_lote)) $errores[] = 'El número de lote es requerido';
-        if ($correo && !esEmailValido($correo)) $errores[] = 'El correo no es válido';
-        
-        if ($crear_usuario) {
-            if (empty($correo)) $errores[] = 'El correo es requerido para crear usuario';
-            if (empty($password_usuario)) $errores[] = 'La contraseña es requerida para crear usuario';
-            elseif (strlen($password_usuario) < PASSWORD_MIN_LENGTH) $errores[] = 'La contraseña debe tener al menos ' . PASSWORD_MIN_LENGTH . ' caracteres';
-        }
+        if (empty($correo))     $errores[] = 'El correo es requerido';
+        elseif (!esEmailValido($correo)) $errores[] = 'El correo no es válido';
         
         if (empty($errores)) {
             $db = Database::getInstance()->getConnection();
@@ -441,15 +433,15 @@ function crearCliente() {
                 
                 $cliente_id = $modelo_cliente->insertar($datos_cliente);
                 
-                // Crear usuario si se solicita
-                if ($crear_usuario && $correo) {
-                    $modelo_usuario = new Usuario();
+                // Crear usuario automáticamente: correo = usuario, DNI = contraseña
+                $modelo_usuario = new Usuario();
+                if ($correo && !$modelo_usuario->correoExiste($correo)) {
                     $modelo_usuario->crearUsuario([
                         'nombre_completo' => $nombres . ' ' . $apellidos,
-                        'correo' => $correo,
-                        'password' => $password_usuario,
-                        'rol' => 'cliente',
-                        'cliente_id' => $cliente_id
+                        'correo'          => $correo,
+                        'password'        => $dni,
+                        'rol'             => 'cliente',
+                        'cliente_id'      => $cliente_id,
                     ]);
                 }
                 
@@ -571,22 +563,9 @@ function crearCliente() {
                     </select>
                 </div>
                 
-                <div class="form-group" style="padding: 1rem; background: var(--color-fondo); border-radius: var(--radio);">
-                    <div class="form-check">
-                        <input type="checkbox" name="crear_usuario" id="crear_usuario" 
-                               <?php echo isset($_POST['crear_usuario']) ? 'checked' : ''; ?>>
-                        <label for="crear_usuario" style="margin: 0; font-weight: 500;">
-                            Crear usuario para acceso al sistema
-                        </label>
-                    </div>
-                </div>
-                
-                <div id="usuario-fields" style="<?php echo !isset($_POST['crear_usuario']) ? 'display: none;' : ''; ?>">
-                    <div class="form-group">
-                        <label>Contraseña para el usuario</label>
-                        <input type="password" name="password_usuario" class="form-control" minlength="6"
-                               placeholder="Mínimo <?php echo PASSWORD_MIN_LENGTH; ?> caracteres">
-                    </div>
+                <div class="alert alert-info" style="font-size:.875rem;">
+                    <i class="fas fa-info-circle"></i>
+                    Se creará automáticamente un usuario de acceso: <strong>correo</strong> como usuario y <strong>DNI</strong> como contraseña.
                 </div>
                 
                 <div class="d-flex gap-2 mt-3">
@@ -601,11 +580,6 @@ function crearCliente() {
         </div>
     </div>
     
-    <script>
-        document.getElementById('crear_usuario').addEventListener('change', function() {
-            document.getElementById('usuario-fields').style.display = this.checked ? 'block' : 'none';
-        });
-    </script>
     
     <?php
     $contenido = ob_get_clean();
