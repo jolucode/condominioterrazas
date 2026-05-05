@@ -259,10 +259,13 @@ function mostrarMisPagos(array $mis_ids, array $mis_lotes, array $cliente_base) 
                 <button class="tab-mis" data-tab="cp-insc"
                         style="padding:.5rem 1.2rem;border:none;background:none;cursor:pointer;color:var(--color-texto-claro);border-bottom:2px solid transparent;margin-bottom:-2px;">
                     <i class="fas fa-file-signature"></i> Inscripción
-                    <?php if ($inscripcion && $inscripcion['estado'] !== 'pagado'): ?>
-                        <span class="badge badge-warning" style="margin-left:4px;">Pendiente</span>
-                    <?php elseif ($inscripcion): ?>
-                        <span class="badge badge-success" style="margin-left:4px;">Pagada</span>
+                    <?php
+                    $insc_pendientes = count(array_filter($inscripciones ?? [], fn($i) => $i['estado'] !== 'pagado'));
+                    $insc_total      = count($inscripciones ?? []);
+                    if ($insc_pendientes > 0): ?>
+                        <span class="badge badge-warning" style="margin-left:4px;"><?php echo $insc_pendientes; ?> pendiente(s)</span>
+                    <?php elseif ($insc_total > 0): ?>
+                        <span class="badge badge-success" style="margin-left:4px;">Al día</span>
                     <?php endif; ?>
                 </button>
                 <button class="tab-mis" data-tab="cp-memb"
