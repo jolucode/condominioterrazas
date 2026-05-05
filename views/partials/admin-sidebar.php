@@ -36,10 +36,6 @@
                 <i class="fas fa-id-card"></i>
                 <span>Membresía Club</span>
             </a>
-            <a href="<?php echo APP_URL; ?>/controllers/comprobante_controller.php?accion=listar" class="nav-link <?php echo ($pagina_actual === 'comprobantes') ? 'active' : ''; ?>">
-                <i class="fas fa-file-invoice"></i>
-                <span>Comprobantes</span>
-            </a>
         </div>
         
         <div class="nav-section">

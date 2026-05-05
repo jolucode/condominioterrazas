@@ -8,7 +8,13 @@ if (!estaAutenticado() || !esAdministrador()) {
     redirigir('login.php');
 }
 
+// Módulo temporalmente desactivado
 $accion = $_GET['accion'] ?? 'listar';
+if ($accion === 'listar') {
+    setFlashMessage('info', 'El módulo de Comprobantes está temporalmente desactivado.');
+    redirigir('index.php');
+}
+
 $modelo_comprobante = new Comprobante();
 
 switch ($accion) {
