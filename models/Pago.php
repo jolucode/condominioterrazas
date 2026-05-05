@@ -103,7 +103,7 @@ class Pago extends ModeloBase {
         $por_pagina = intval($por_pagina);
         
         $sql = "SELECT p.*, CONCAT(c.nombres, ' ', c.apellidos) as cliente_nombre,
-                       c.dni as cliente_dni, c.numero_lote, c.telefono
+                       c.dni as cliente_dni, c.numero_lote, c.manzana, c.etapa, c.telefono
                 FROM pagos p
                 INNER JOIN clientes c ON p.cliente_id = c.id
                 {$whereSQL}

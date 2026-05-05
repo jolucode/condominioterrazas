@@ -165,11 +165,15 @@ function listarPagos() {
                                     <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
                                     <td class="actions">
                                         <?php if ($pago['estado'] !== 'pagado'): ?>
-                                            <?php 
+                                            <?php
+                                            $lote_id  = 'Lote *' . $pago['numero_lote'] . '*';
+                                            if (!empty($pago['manzana'])) $lote_id .= ', Mz *' . $pago['manzana'] . '*';
+                                            if (!empty($pago['etapa']))   $lote_id .= ', Etapa *' . $pago['etapa'] . '*';
+
                                             if ($pago['estado'] === 'vencido') {
-                                                $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te informamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* *VENCIO* el día *" . formatearFecha($pago['fecha_vencimiento']) . "*. El monto pendiente es *" . formatearMoneda($pago['monto']) . "*. Por favor, agradeceremos regularizar su pago a la brevedad. ¡Muchas gracias!";
+                                                $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te informamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* correspondiente al {$lote_id} *VENCIÓ* el día *" . formatearFecha($pago['fecha_vencimiento']) . "*. El monto pendiente es *" . formatearMoneda($pago['monto']) . "*. Por favor, regulariza tu pago a la brevedad. ¡Muchas gracias!";
                                             } else {
-                                                $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te recordamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* vence el *" . formatearFecha($pago['fecha_vencimiento']) . "*. Monto: *" . formatearMoneda($pago['monto']) . "*. Evita recargos pagando a tiempo. ¡Muchas gracias!";
+                                                $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te recordamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* correspondiente al {$lote_id} vence el *" . formatearFecha($pago['fecha_vencimiento']) . "*. Monto: *" . formatearMoneda($pago['monto']) . "*. Evita recargos pagando a tiempo. ¡Muchas gracias!";
                                             }
                                             $url_wa = "https://api.whatsapp.com/send?phone=51" . preg_replace('/[^0-9]/', '', $pago['telefono'] ?? '') . "&text=" . urlencode($mensaje_wa);
                                             ?>
@@ -418,11 +422,15 @@ function listarPagosAjax() {
                         <td><?php echo $pago['fecha_pago'] ? formatearFecha($pago['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
                         <td class="actions">
                             <?php if ($pago['estado'] !== 'pagado'): ?>
-                                <?php 
+                                <?php
+                                $lote_id  = 'Lote *' . $pago['numero_lote'] . '*';
+                                if (!empty($pago['manzana'])) $lote_id .= ', Mz *' . $pago['manzana'] . '*';
+                                if (!empty($pago['etapa']))   $lote_id .= ', Etapa *' . $pago['etapa'] . '*';
+
                                 if ($pago['estado'] === 'vencido') {
-                                    $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te informamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* *VENCIO* el día *" . formatearFecha($pago['fecha_vencimiento']) . "*. El monto pendiente es *" . formatearMoneda($pago['monto']) . "*. Por favor, agradeceremos regularizar su pago a la brevedad. ¡Muchas gracias!";
+                                    $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te informamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* correspondiente al {$lote_id} *VENCIÓ* el día *" . formatearFecha($pago['fecha_vencimiento']) . "*. El monto pendiente es *" . formatearMoneda($pago['monto']) . "*. Por favor, regulariza tu pago a la brevedad. ¡Muchas gracias!";
                                 } else {
-                                    $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te recordamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* vence el *" . formatearFecha($pago['fecha_vencimiento']) . "*. Monto: *" . formatearMoneda($pago['monto']) . "*. Evita recargos pagando a tiempo. ¡Muchas gracias!";
+                                    $mensaje_wa = "Hola *" . $pago['cliente_nombre'] . "*, te saludamos de Condominio Terrazas. Te recordamos que tu cuota de mantenimiento de *" . nombreMes($pago['mes']) . " " . $pago['anio'] . "* correspondiente al {$lote_id} vence el *" . formatearFecha($pago['fecha_vencimiento']) . "*. Monto: *" . formatearMoneda($pago['monto']) . "*. Evita recargos pagando a tiempo. ¡Muchas gracias!";
                                 }
                                 $url_wa = "https://api.whatsapp.com/send?phone=51" . preg_replace('/[^0-9]/', '', $pago['telefono'] ?? '') . "&text=" . urlencode($mensaje_wa);
                                 ?>
