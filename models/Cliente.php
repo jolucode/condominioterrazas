@@ -195,6 +195,18 @@ class Cliente extends ModeloBase {
     }
     
     /**
+     * Obtener todos los lotes de un propietario por DNI
+     */
+    public function obtenerPorDni($dni) {
+        $sql = "SELECT * FROM {$this->tabla}
+                WHERE dni = :dni AND estado = 'activo'
+                ORDER BY etapa ASC, manzana ASC, numero_lote ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':dni' => $dni]);
+        return $stmt->fetchAll();
+    }
+
+    /**
      * Obtener etapas distintas registradas (para filtros)
      */
     public function obtenerEtapas() {

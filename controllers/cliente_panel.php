@@ -8,172 +8,215 @@ if (!estaAutenticado() || !esCliente()) {
     redirigir('login.php');
 }
 
-$cliente_id = $_SESSION['usuario_cliente_id'];
+// Obtener el cliente vinculado a la sesión y todos sus lotes por DNI
+$cliente_id_sesion = $_SESSION['usuario_cliente_id'];
+$modelo_cli_base   = new Cliente();
+$cliente_base      = $modelo_cli_base->obtenerPorId($cliente_id_sesion);
+
+if (!$cliente_base) {
+    redirigir('login.php');
+}
+
+// Todos los lotes del propietario (mismo DNI)
+$mis_lotes  = $modelo_cli_base->obtenerPorDni($cliente_base['dni']);
+$mis_ids    = array_column($mis_lotes, 'id');
+if (empty($mis_ids)) $mis_ids = [$cliente_id_sesion];
+
 $accion = $_GET['accion'] ?? 'inicio';
 
 switch ($accion) {
     case 'inicio':
-        mostrarInicio($cliente_id);
+        mostrarInicio($mis_ids, $mis_lotes, $cliente_base);
         break;
     case 'mis_pagos':
-        mostrarMisPagos($cliente_id);
+        mostrarMisPagos($mis_ids, $mis_lotes, $cliente_base);
         break;
     case 'mis_comprobantes':
-        mostrarMisComprobantes($cliente_id);
+        mostrarMisComprobantes($mis_ids);
         break;
     case 'reuniones':
-        mostrarReuniones($cliente_id);
+        mostrarReuniones();
         break;
     case 'mi_perfil':
-        mostrarMiPerfil($cliente_id);
+        mostrarMiPerfil($mis_lotes, $cliente_base);
         break;
     default:
-        mostrarInicio($cliente_id);
+        mostrarInicio($mis_ids, $mis_lotes, $cliente_base);
         break;
 }
 
-function mostrarInicio($cliente_id) {
-    $modelo_cliente = new Cliente();
-    $cliente = $modelo_cliente->obtenerConResumen($cliente_id);
-    
-    $modelo_pago = new Pago();
-    $mes_actual = date('n');
-    $anio_actual = date('Y');
-    
-    // Pago del mes actual
-    $sql = "SELECT * FROM pagos WHERE cliente_id = :cliente_id AND mes = :mes AND anio = :anio LIMIT 1";
-    $db = Database::getInstance()->getConnection();
-    $stmt = $db->prepare($sql);
-    $stmt->execute([':cliente_id' => $cliente_id, ':mes' => $mes_actual, ':anio' => $anio_actual]);
-    $pago_mes = $stmt->fetch();
-    
+function mostrarInicio(array $mis_ids, array $mis_lotes, array $cliente_base) {
+    $modelo_pago    = new Pago();
+    $modelo_pago->actualizarEstadosVencidos();
+    $mes_actual     = date('n');
+    $anio_actual    = date('Y');
+
+    // Resumen consolidado de todos los lotes
+    $resumen        = $modelo_pago->resumenPorClientes($mis_ids);
+    $mant           = $resumen['mantenimiento'];
+    $deuda_total    = $mant['total_deuda'] + $resumen['inscripcion']['total_deuda'] + $resumen['membresia_cuota']['total_deuda'];
+
+    // Estado de mantenimiento de este mes por lote
+    $db   = Database::getInstance()->getConnection();
+    $ph   = implode(',', array_fill(0, count($mis_ids), '?'));
+    $stmt = $db->prepare(
+        "SELECT p.*, c.numero_lote, c.manzana, c.etapa
+         FROM pagos p INNER JOIN clientes c ON p.cliente_id = c.id
+         WHERE p.cliente_id IN ({$ph})
+         AND p.tipo_pago = 'mantenimiento' AND p.mes = ? AND p.anio = ?
+         ORDER BY c.etapa, c.manzana, c.numero_lote"
+    );
+    $stmt->execute(array_merge($mis_ids, [$mes_actual, $anio_actual]));
+    $pagos_mes = $stmt->fetchAll();
+
     // Próxima reunión
-    $modelo_reunion = new Reunion();
+    $modelo_reunion  = new Reunion();
     $proxima_reunion = $modelo_reunion->obtenerProxima();
-    
-    // Últimas reuniones publicadas
-    $reuniones = $modelo_reunion->obtenerPublicadas();
-    $reuniones = array_slice($reuniones, 0, 3);
-    
-    $titulo = 'Mi Panel';
-    $subtitulo = 'Bienvenido, ' . $cliente['nombres'];
+
+    $titulo      = 'Mi Panel';
+    $subtitulo   = 'Bienvenido, ' . $cliente_base['nombres'];
     $pagina_actual = 'inicio';
-    
-    ob_start();
-    ?>
-    
+
+    ob_start(); ?>
+
+    <!-- Stats -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon blue"><i class="fas fa-home"></i></div>
             <div class="stat-info">
-                <div class="label">Mi Lote</div>
-                <div class="value"><?php echo $cliente['numero_lote']; ?></div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon <?php echo ($pago_mes['estado'] ?? 'pendiente') === 'pagado' ? 'green' : 'red'; ?>">
-                <i class="fas fa-money-bill-wave"></i>
-            </div>
-            <div class="stat-info">
-                <div class="label">Estado <?php echo nombreMes($mes_actual); ?></div>
-                <div class="value"><?php echo textoEstadoPago($pago_mes['estado'] ?? 'pendiente'); ?></div>
+                <div class="label">Mis Lotes</div>
+                <div class="value"><?php echo count($mis_lotes); ?></div>
             </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
             <div class="stat-info">
-                <div class="label">Pagos Realizados</div>
-                <div class="value"><?php echo $cliente['pagos_realizados']; ?></div>
+                <div class="label">Cuotas Pagadas</div>
+                <div class="value"><?php echo $mant['pagados']; ?></div>
             </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
             <div class="stat-info">
-                <div class="label">Pagos Pendientes</div>
-                <div class="value"><?php echo $cliente['pagos_pendientes']; ?></div>
+                <div class="label">Cuotas Pendientes</div>
+                <div class="value"><?php echo $mant['pendientes'] + $mant['vencidos']; ?></div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon <?php echo $deuda_total > 0 ? 'red' : 'green'; ?>">
+                <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-info">
+                <div class="label">Deuda Total</div>
+                <div class="value" style="font-size:1rem;"><?php echo formatearMoneda($deuda_total); ?></div>
             </div>
         </div>
     </div>
-    
-    <div class="grid grid-2">
-        <!-- Próxima reunión -->
-        <div class="card">
-            <div class="card-header">
-                <h3><i class="fas fa-calendar-alt"></i> Próxima Reunión</h3>
+
+    <!-- Mis lotes y su estado este mes -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3><i class="fas fa-map-marker-alt"></i> Mis Lotes — <?php echo nombreMes($mes_actual) . ' ' . $anio_actual; ?></h3>
+        </div>
+        <div class="card-body">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Etapa</th><th>Manzana</th><th>Lote</th>
+                            <th>F. Compra</th><th>Manto. <?php echo nombreMes($mes_actual); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($mis_lotes as $lote):
+                        $pago_lote = array_filter($pagos_mes, fn($p) => $p['numero_lote'] === $lote['numero_lote']
+                            && $p['manzana'] === $lote['manzana'] && $p['etapa'] === $lote['etapa']);
+                        $pago_lote = reset($pago_lote);
+                        $estado_m  = $pago_lote ? $pago_lote['estado'] : null;
+                    ?>
+                        <tr>
+                            <td><?php echo $lote['etapa']    ?: '-'; ?></td>
+                            <td><?php echo $lote['manzana']  ?: '-'; ?></td>
+                            <td><strong><?php echo $lote['numero_lote']; ?></strong></td>
+                            <td><?php echo $lote['fecha_compra'] ? formatearFecha($lote['fecha_compra']) : '-'; ?></td>
+                            <td>
+                                <?php if ($estado_m): ?>
+                                    <span class="badge <?php echo claseEstadoPago($estado_m); ?>"><?php echo textoEstadoPago($estado_m); ?></span>
+                                <?php else: ?>
+                                    <span style="color:var(--color-texto-claro);font-size:.85rem;">Sin registro</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
-            <div class="card-body">
-                <?php if ($proxima_reunion): ?>
-                    <h4><?php echo $proxima_reunion['titulo']; ?></h4>
-                    <p style="color: var(--color-texto-claro);">
-                        <i class="fas fa-calendar"></i> <?php echo formatearFecha($proxima_reunion['fecha_reunion']); ?>
-                        <?php if ($proxima_reunion['hora_reunion']): ?>
-                            <i class="fas fa-clock"></i> <?php echo date('H:i', strtotime($proxima_reunion['hora_reunion'])); ?>
-                        <?php endif; ?>
-                    </p>
-                    <?php if ($proxima_reunion['lugar']): ?>
-                        <p><i class="fas fa-map-marker-alt"></i> <?php echo $proxima_reunion['lugar']; ?></p>
+        </div>
+    </div>
+
+    <!-- Próxima reunión -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-calendar-alt"></i> Próxima Reunión</h3>
+        </div>
+        <div class="card-body">
+            <?php if ($proxima_reunion): ?>
+                <h4><?php echo $proxima_reunion['titulo']; ?></h4>
+                <p style="color:var(--color-texto-claro);">
+                    <i class="fas fa-calendar"></i> <?php echo formatearFecha($proxima_reunion['fecha_reunion']); ?>
+                    <?php if ($proxima_reunion['hora_reunion']): ?>
+                        <i class="fas fa-clock"></i> <?php echo date('H:i', strtotime($proxima_reunion['hora_reunion'])); ?>
                     <?php endif; ?>
-                    <a href="<?php echo APP_URL; ?>/controllers/cliente_panel.php?accion=reuniones" class="btn btn-outline btn-sm mt-2">
-                        Ver todas las reuniones
-                    </a>
-                <?php else: ?>
-                    <p style="color: var(--color-texto-claro);">No hay reuniones programadas</p>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <!-- Últimos acuerdos -->
-        <div class="card">
-            <div class="card-header">
-                <h3><i class="fas fa-handshake"></i> Últimos Acuerdos</h3>
-            </div>
-            <div class="card-body">
-                <?php
-                $modelo_acuerdo = new Acuerdo();
-                $acuerdos = $modelo_acuerdo->obtenerPendientes();
-                ?>
-                <?php if (!empty($acuerdos)): ?>
-                    <ul style="list-style: none; padding: 0;">
-                        <?php foreach (array_slice($acuerdos, 0, 5) as $acuerdo): ?>
-                            <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--color-borde);">
-                                <div style="font-weight: 500;"><?php echo $acuerdo['descripcion']; ?></div>
-                                <small style="color: var(--color-texto-claro);">
-                                    <?php echo $acuerdo['reunion_titulo']; ?> - <?php echo formatearFecha($acuerdo['fecha_reunion']); ?>
-                                </small>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p style="color: var(--color-texto-claro);">No hay acuerdos pendientes</p>
-                <?php endif; ?>
-            </div>
+                    <?php if ($proxima_reunion['lugar']): ?>
+                        &nbsp;<i class="fas fa-map-marker-alt"></i> <?php echo $proxima_reunion['lugar']; ?>
+                    <?php endif; ?>
+                </p>
+                <a href="<?php echo APP_URL; ?>/controllers/cliente_panel.php?accion=reuniones"
+                   class="btn btn-outline btn-sm mt-2">Ver todas las reuniones</a>
+            <?php else: ?>
+                <p style="color:var(--color-texto-claro);">No hay reuniones programadas</p>
+            <?php endif; ?>
         </div>
     </div>
-    
+
     <?php
     $contenido = ob_get_clean();
     vista('partials/cliente-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
 }
 
-function mostrarMisPagos($cliente_id) {
-    $modelo_pago    = new Pago();
-    $modelo_cliente = new Cliente();
+function mostrarMisPagos(array $mis_ids, array $mis_lotes, array $cliente_base) {
+    $modelo_pago = new Pago();
+    $modelo_pago->actualizarEstadosVencidos();
 
     $anio    = intval($_GET['anio'] ?? date('Y'));
-    $resumen = $modelo_pago->resumenPorCliente($cliente_id);
+    $resumen = $modelo_pago->resumenPorClientes($mis_ids);
     $mant    = $resumen['mantenimiento'];
     $insc    = $resumen['inscripcion'];
     $memb    = $resumen['membresia_cuota'];
 
-    $pagos_mant  = $modelo_pago->obtenerPorCliente($cliente_id, $anio, 'mantenimiento');
+    // Mantenimiento: todos los lotes, año seleccionado
+    $pagos_mant = $modelo_pago->obtenerPorClientes($mis_ids, $anio, 'mantenimiento');
 
-    $db   = Database::getInstance()->getConnection();
-    $stmt = $db->prepare("SELECT * FROM pagos WHERE cliente_id=:cid AND tipo_pago='inscripcion' LIMIT 1");
-    $stmt->execute([':cid' => $cliente_id]);
-    $inscripcion = $stmt->fetch();
+    // Inscripciones: una por lote
+    $db  = Database::getInstance()->getConnection();
+    $ph  = implode(',', array_fill(0, count($mis_ids), '?'));
+    $stmt = $db->prepare(
+        "SELECT p.*, c.numero_lote, c.manzana, c.etapa
+         FROM pagos p INNER JOIN clientes c ON p.cliente_id = c.id
+         WHERE p.cliente_id IN ({$ph}) AND p.tipo_pago='inscripcion'
+         ORDER BY c.etapa, c.manzana, c.numero_lote"
+    );
+    $stmt->execute($mis_ids);
+    $inscripciones = $stmt->fetchAll();
 
-    $stmt_m = $db->prepare("SELECT * FROM pagos WHERE cliente_id=:cid AND tipo_pago='membresia_cuota' ORDER BY cuota_numero ASC");
-    $stmt_m->execute([':cid' => $cliente_id]);
+    // Membresía: cuotas de todos los lotes
+    $stmt_m = $db->prepare(
+        "SELECT p.*, c.numero_lote, c.manzana, c.etapa
+         FROM pagos p INNER JOIN clientes c ON p.cliente_id = c.id
+         WHERE p.cliente_id IN ({$ph}) AND p.tipo_pago='membresia_cuota'
+         ORDER BY c.numero_lote, p.cuota_numero ASC"
+    );
+    $stmt_m->execute($mis_ids);
     $cuotas_memb = $stmt_m->fetchAll();
 
     $deuda_total = $mant['total_deuda'] + $insc['total_deuda'] + $memb['total_deuda'];
@@ -249,10 +292,16 @@ function mostrarMisPagos($cliente_id) {
                 <?php if (!empty($pagos_mant)): ?>
                 <div class="table-container">
                     <table class="table">
-                        <thead><tr><th>Mes</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
+                        <thead><tr>
+                            <?php if (count($mis_ids) > 1): ?><th>Lote</th><?php endif; ?>
+                            <th>Mes</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th>
+                        </tr></thead>
                         <tbody>
                         <?php foreach ($pagos_mant as $p): ?>
                             <tr>
+                                <?php if (count($mis_ids) > 1): ?>
+                                    <td><small style="color:var(--color-texto-claro);">Lote <?php echo $p['numero_lote']; ?><?php echo $p['manzana'] ? ' / Mz '.$p['manzana'] : ''; ?></small></td>
+                                <?php endif; ?>
                                 <td><?php echo nombreMes($p['mes']) . ' ' . $p['anio']; ?></td>
                                 <td><?php echo formatearMoneda($p['monto']); ?></td>
                                 <td><?php echo formatearFecha($p['fecha_vencimiento']); ?></td>
@@ -271,19 +320,26 @@ function mostrarMisPagos($cliente_id) {
 
             <!-- Tab Inscripción -->
             <div id="cp-insc" class="tab-mis-content" style="display:none;">
-                <?php if ($inscripcion): ?>
+                <?php if (!empty($inscripciones)): ?>
                 <div class="table-container">
                     <table class="table">
-                        <thead><tr><th>Concepto</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
+                        <thead><tr>
+                            <?php if (count($mis_ids) > 1): ?><th>Lote</th><?php endif; ?>
+                            <th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th>
+                        </tr></thead>
                         <tbody>
+                        <?php foreach ($inscripciones as $ins): ?>
                             <tr>
-                                <td>Inscripción / Empadronamiento</td>
-                                <td><?php echo formatearMoneda($inscripcion['monto']); ?></td>
-                                <td><?php echo formatearFecha($inscripcion['fecha_vencimiento']); ?></td>
-                                <td><span class="badge <?php echo claseEstadoPago($inscripcion['estado']); ?>"><?php echo textoEstadoPago($inscripcion['estado']); ?></span></td>
-                                <td><?php echo $inscripcion['fecha_pago'] ? formatearFecha($inscripcion['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
-                                <td><?php echo $inscripcion['metodo_pago'] ? nombreMetodoPago($inscripcion['metodo_pago']) : '-'; ?></td>
+                                <?php if (count($mis_ids) > 1): ?>
+                                    <td><small style="color:var(--color-texto-claro);">Lote <?php echo $ins['numero_lote']; ?><?php echo $ins['manzana'] ? ' / Mz '.$ins['manzana'] : ''; ?></small></td>
+                                <?php endif; ?>
+                                <td><?php echo formatearMoneda($ins['monto']); ?></td>
+                                <td><?php echo formatearFecha($ins['fecha_vencimiento']); ?></td>
+                                <td><span class="badge <?php echo claseEstadoPago($ins['estado']); ?>"><?php echo textoEstadoPago($ins['estado']); ?></span></td>
+                                <td><?php echo $ins['fecha_pago'] ? formatearFecha($ins['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
+                                <td><?php echo $ins['metodo_pago'] ? nombreMetodoPago($ins['metodo_pago']) : '-'; ?></td>
                             </tr>
+                        <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -300,13 +356,14 @@ function mostrarMisPagos($cliente_id) {
             <div id="cp-memb" class="tab-mis-content" style="display:none;">
                 <?php if (!empty($cuotas_memb)): ?>
                 <?php
-                $plan_t  = $cuotas_memb[0]['total_cuotas'];
-                $pagd    = count(array_filter($cuotas_memb, fn($c) => $c['estado'] === 'pagado'));
-                $pct_m   = $plan_t > 0 ? round(($pagd / $plan_t) * 100) : 0;
+                $total_cuotas_plan = array_sum(array_unique(array_column($cuotas_memb, 'total_cuotas')));
+                $pagd  = count(array_filter($cuotas_memb, fn($c) => $c['estado'] === 'pagado'));
+                $tot   = count($cuotas_memb);
+                $pct_m = $tot > 0 ? round(($pagd / $tot) * 100) : 0;
                 ?>
                 <div style="margin-bottom:1rem;">
                     <div style="display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:6px;">
-                        <span><?php echo $pagd; ?> / <?php echo $plan_t; ?> cuotas pagadas</span>
+                        <span><?php echo $pagd; ?> / <?php echo $tot; ?> cuotas pagadas</span>
                         <strong><?php echo $pct_m; ?>%</strong>
                     </div>
                     <div style="background:var(--color-borde);border-radius:6px;height:10px;overflow:hidden;">
@@ -315,16 +372,21 @@ function mostrarMisPagos($cliente_id) {
                 </div>
                 <div class="table-container">
                     <table class="table">
-                        <thead><tr><th>Cuota</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th><th>Método</th></tr></thead>
+                        <thead><tr>
+                            <?php if (count($mis_ids) > 1): ?><th>Lote</th><?php endif; ?>
+                            <th>Cuota</th><th>Monto</th><th>Vencimiento</th><th>Estado</th><th>Fecha Pago</th>
+                        </tr></thead>
                         <tbody>
                         <?php foreach ($cuotas_memb as $c): ?>
                             <tr>
+                                <?php if (count($mis_ids) > 1): ?>
+                                    <td><small style="color:var(--color-texto-claro);">Lote <?php echo $c['numero_lote']; ?></small></td>
+                                <?php endif; ?>
                                 <td><span class="badge badge-info"><?php echo $c['cuota_numero']; ?>/<?php echo $c['total_cuotas']; ?></span></td>
                                 <td><?php echo formatearMoneda($c['monto']); ?></td>
                                 <td><?php echo formatearFecha($c['fecha_vencimiento']); ?></td>
                                 <td><span class="badge <?php echo claseEstadoPago($c['estado']); ?>"><?php echo textoEstadoPago($c['estado']); ?></span></td>
                                 <td><?php echo $c['fecha_pago'] ? formatearFecha($c['fecha_pago'], 'd/m/Y H:i') : '-'; ?></td>
-                                <td><?php echo $c['metodo_pago'] ? nombreMetodoPago($c['metodo_pago']) : '-'; ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -370,9 +432,22 @@ function mostrarMisPagos($cliente_id) {
     vista('partials/cliente-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
 }
 
-function mostrarMisComprobantes($cliente_id) {
+function mostrarMisComprobantes(array $mis_ids) {
     $modelo_comprobante = new Comprobante();
-    $comprobantes = $modelo_comprobante->obtenerPorCliente($cliente_id);
+    // Obtener comprobantes de todos los lotes
+    $db   = Database::getInstance()->getConnection();
+    $ph   = implode(',', array_fill(0, count($mis_ids), '?'));
+    $stmt = $db->prepare(
+        "SELECT c.*, p.mes, p.anio, p.tipo_pago, p.cuota_numero,
+                cl.numero_lote, cl.manzana
+         FROM comprobantes c
+         INNER JOIN pagos p ON c.pago_id = p.id
+         INNER JOIN clientes cl ON c.cliente_id = cl.id
+         WHERE c.cliente_id IN ({$ph}) AND c.estado_emision = 'emitido'
+         ORDER BY c.fecha_creacion DESC"
+    );
+    $stmt->execute($mis_ids);
+    $comprobantes = $stmt->fetchAll();
     
     $titulo = 'Mis Comprobantes';
     $subtitulo = 'Descarga tus comprobantes de pago';
@@ -433,7 +508,7 @@ function mostrarMisComprobantes($cliente_id) {
     vista('partials/cliente-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
 }
 
-function mostrarReuniones($cliente_id) {
+function mostrarReuniones() {
     $modelo_reunion  = new Reunion();
     $modelo_archivo  = new ArchivoAdjunto();
     $reuniones       = $modelo_reunion->obtenerPublicadas();
@@ -529,9 +604,8 @@ function mostrarReuniones($cliente_id) {
     vista('partials/cliente-layout', compact('titulo', 'subtitulo', 'contenido', 'pagina_actual'));
 }
 
-function mostrarMiPerfil($cliente_id) {
-    $modelo_cliente = new Cliente();
-    $cliente = $modelo_cliente->obtenerPorId($cliente_id);
+function mostrarMiPerfil(array $mis_lotes, array $cliente_base) {
+    $cliente = $cliente_base;
     
     $titulo = 'Mi Perfil';
     $subtitulo = 'Mi información personal';
@@ -573,27 +647,31 @@ function mostrarMiPerfil($cliente_id) {
         
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-home"></i> Mi Propiedad</h3>
+                <h3><i class="fas fa-home"></i> Mis Propiedades (<?php echo count($mis_lotes); ?> lote<?php echo count($mis_lotes) > 1 ? 's' : ''; ?>)</h3>
             </div>
             <div class="card-body">
-                <ul class="detail-list">
-                    <li>
-                        <span class="label">Número de Lote</span>
-                        <span class="value"><?php echo $cliente['numero_lote']; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Manzana</span>
-                        <span class="value"><?php echo $cliente['manzana'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Etapa</span>
-                        <span class="value"><?php echo $cliente['etapa'] ?: '-'; ?></span>
-                    </li>
-                    <li>
-                        <span class="label">Dirección</span>
-                        <span class="value"><?php echo $cliente['direccion'] ?: '-'; ?></span>
-                    </li>
-                </ul>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Etapa</th>
+                                <th>Manzana</th>
+                                <th>Lote</th>
+                                <th>F. Compra</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($mis_lotes as $lote): ?>
+                            <tr>
+                                <td><?php echo $lote['etapa']       ?: '-'; ?></td>
+                                <td><?php echo $lote['manzana']     ?: '-'; ?></td>
+                                <td><strong><?php echo $lote['numero_lote']; ?></strong></td>
+                                <td><?php echo $lote['fecha_compra'] ? formatearFecha($lote['fecha_compra']) : '-'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

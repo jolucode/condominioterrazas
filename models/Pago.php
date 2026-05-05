@@ -312,6 +312,60 @@ class Pago extends ModeloBase {
     }
 
     /**
+     * Obtener pagos para múltiples clientes (multi-lote)
+     */
+    public function obtenerPorClientes(array $ids, $anio = null, $tipo_pago = 'mantenimiento') {
+        if (empty($ids)) return [];
+        $ph   = implode(',', array_fill(0, count($ids), '?'));
+        $params = $ids;
+        $sql  = "SELECT p.*, CONCAT(c.nombres,' ',c.apellidos) as cliente_nombre,
+                        c.numero_lote, c.manzana, c.etapa
+                 FROM {$this->tabla} p
+                 INNER JOIN clientes c ON p.cliente_id = c.id
+                 WHERE p.cliente_id IN ({$ph})
+                 AND p.tipo_pago = ?";
+        $params[] = $tipo_pago;
+        if ($anio) { $sql .= " AND p.anio = ?"; $params[] = $anio; }
+        $orden = $tipo_pago === 'mantenimiento' ? 'p.anio DESC, p.mes DESC' : 'p.cuota_numero ASC';
+        $sql .= " ORDER BY c.etapa, c.manzana, c.numero_lote, {$orden}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Resumen consolidado de pagos para múltiples clientes (multi-lote)
+     */
+    public function resumenPorClientes(array $ids) {
+        if (empty($ids)) return [
+            'mantenimiento'   => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+            'inscripcion'     => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+            'membresia_cuota' => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+        ];
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $sql = "SELECT tipo_pago,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN estado='pagado'    THEN 1 ELSE 0 END) as pagados,
+                    SUM(CASE WHEN estado='pendiente' THEN 1 ELSE 0 END) as pendientes,
+                    SUM(CASE WHEN estado='vencido'   THEN 1 ELSE 0 END) as vencidos,
+                    SUM(CASE WHEN estado='pagado'    THEN monto ELSE 0 END) as total_pagado,
+                    SUM(CASE WHEN estado!='pagado'   THEN monto ELSE 0 END) as total_deuda
+                FROM {$this->tabla}
+                WHERE cliente_id IN ({$ph})
+                GROUP BY tipo_pago";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($ids);
+        $rows = $stmt->fetchAll();
+        $resumen = [
+            'mantenimiento'   => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+            'inscripcion'     => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+            'membresia_cuota' => ['total'=>0,'pagados'=>0,'pendientes'=>0,'vencidos'=>0,'total_pagado'=>0,'total_deuda'=>0],
+        ];
+        foreach ($rows as $r) { $resumen[$r['tipo_pago']] = $r; }
+        return $resumen;
+    }
+
+    /**
      * Obtener resumen de todos los tipos de pago de un cliente
      */
     public function resumenPorCliente($cliente_id) {
