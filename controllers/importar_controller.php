@@ -63,14 +63,15 @@ function mostrarFormulario() {
                         <tbody>
                             <?php
                             $cols = [
-                                ['A', 'DNI',       true],
-                                ['B', 'Nombres',   true],
-                                ['C', 'Apellidos', true],
-                                ['D', 'Teléfono',  true],
-                                ['E', 'Correo',    true],
-                                ['F', 'Etapa',     true],
-                                ['G', 'Manzana',   true],
-                                ['H', 'Lote',      true],
+                                ['A', 'DNI',              true],
+                                ['B', 'Nombres',          true],
+                                ['C', 'Apellidos',        true],
+                                ['D', 'Teléfono',         true],
+                                ['E', 'Correo',           true],
+                                ['F', 'Fecha (D/MM/YYYY)',true],
+                                ['G', 'Etapa',            true],
+                                ['H', 'Manzana',          true],
+                                ['I', 'Lote',             true],
                             ];
                             foreach ($cols as $i => [$col, $campo, $req]):
                                 $bg = $i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,.03)';
@@ -162,6 +163,7 @@ function mostrarFormulario() {
                                 <th>Apellidos</th>
                                 <th>Teléfono</th>
                                 <th>Correo</th>
+                                <th>Fecha Compra</th>
                                 <th>Etapa</th>
                                 <th>Manzana</th>
                                 <th>Lote</th>
@@ -231,7 +233,7 @@ function mostrarFormulario() {
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
 
                     // Buscar hoja "propietarios" o usar la primera
                     const sheetName = wb.SheetNames.includes('propietarios')
@@ -256,9 +258,10 @@ function mostrarFormulario() {
                         apellidos:    normalizar(r[2], 'texto'),
                         telefono:     normalizar(r[3], 'texto'),
                         correo:       normalizar(r[4], 'email'),
-                        etapa:        normalizar(r[5], 'texto'),
-                        manzana:      normalizar(r[6], 'texto'),
-                        numero_lote:  normalizar(r[7], 'texto'),
+                        fecha_compra: normalizar(r[5], 'fecha'),
+                        etapa:        normalizar(r[6], 'texto'),
+                        manzana:      normalizar(r[7], 'texto'),
+                        numero_lote:  normalizar(r[8], 'texto'),
                     }));
 
                     // Verificar en servidor cuáles ya existen
@@ -274,19 +277,36 @@ function mostrarFormulario() {
 
         function normalizar(val, tipo) {
             if (val === null || val === undefined) return '';
-            let s = String(val).trim();
 
+            if (tipo === 'fecha') {
+                // cellDates:true hace que SheetJS devuelva Date objects
+                if (val instanceof Date && !isNaN(val)) {
+                    const y = val.getUTCFullYear();
+                    const m = String(val.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(val.getUTCDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+                // Fallback: string con formato D/MM/YYYY o DD/MM/YYYY
+                const s = String(val).trim();
+                const match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (match) {
+                    const dd = match[1].padStart(2, '0');
+                    const mm = match[2].padStart(2, '0');
+                    return `${match[3]}-${mm}-${dd}`;
+                }
+                return s;
+            }
+
+            let s = String(val).trim();
             if (tipo === 'dni') {
-                // Puede venir como número (47753898), asegurar que sea string de 8 dígitos
-                s = s.replace(/\.0$/, ''); // quitar .0 si viene como float
+                s = s.replace(/\.0$/, '');
                 s = s.padStart(8, '0').substring(0, 8);
             }
             if (tipo === 'email') {
                 s = s.toLowerCase();
             }
             if (tipo === 'texto') {
-                s = s.replace(/\.0$/, ''); // números sin decimales
-                // Capitalizar primera letra para manzana (A, B, C)
+                s = s.replace(/\.0$/, '');
             }
             return s;
         }
@@ -338,6 +358,11 @@ function mostrarFormulario() {
                 else if (esDuplicado)  badgeEstado = `<span class="badge badge-danger">Lote duplicado en Excel</span>${motivo}`;
                 else                   badgeEstado = `<span class="badge badge-danger">Incompleto</span>${motivo}`;
 
+                // Formatear fecha para display: YYYY-MM-DD → DD/MM/YYYY
+                const fechaDisplay = row.fecha_compra
+                    ? row.fecha_compra.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1')
+                    : '';
+
                 tr.innerHTML = `
                     <td>${i + 1}</td>
                     <td>${esc(row.dni)}</td>
@@ -345,6 +370,7 @@ function mostrarFormulario() {
                     <td>${esc(row.apellidos)}</td>
                     <td>${esc(row.telefono)}</td>
                     <td>${esc(row.correo)}</td>
+                    <td>${esc(fechaDisplay)}</td>
                     <td>${esc(row.etapa)}</td>
                     <td>${esc(row.manzana)}</td>
                     <td>${esc(row.numero_lote)}</td>
@@ -396,14 +422,25 @@ function mostrarFormulario() {
                 resumen.style.display  = 'none';
                 resultado.style.display = 'block';
                 if (data.ok) {
+                    let errDetail = '';
+                    if (data.errores > 0 && data.detalle_errores && data.detalle_errores.length) {
+                        const items = data.detalle_errores.map(e => `<li>${esc(e)}</li>`).join('');
+                        errDetail = `
+                            <div class="alert alert-danger" style="margin-top:.75rem;">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <strong>${data.errores} registro(s) no se pudieron insertar:</strong>
+                                <ul style="margin:.5rem 0 0;padding-left:1.5rem;">${items}</ul>
+                            </div>`;
+                    }
+
                     resultado.innerHTML = `
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle"></i>
+                        <div class="alert alert-${data.insertados > 0 ? 'success' : 'warning'}">
+                            <i class="fas fa-${data.insertados > 0 ? 'check-circle' : 'exclamation-circle'}"></i>
                             <strong>Importación completada.</strong>
-                            Se insertaron <strong>${data.insertados}</strong> clientes nuevos.
-                            ${data.errores > 0 ? `<br><span style="color:var(--color-advertencia)">${data.errores} registros tuvieron errores y fueron omitidos.</span>` : ''}
+                            Se insertaron <strong>${data.insertados}</strong> cliente(s) nuevo(s).
                         </div>
-                        <a href="${baseUrl}/controllers/cliente_controller.php?accion=listar" class="btn btn-primary">
+                        ${errDetail}
+                        <a href="${baseUrl}/controllers/cliente_controller.php?accion=listar" class="btn btn-primary mt-2">
                             <i class="fas fa-users"></i> Ver listado de clientes
                         </a>`;
                 } else {
@@ -460,31 +497,43 @@ function previsualizar() {
     $lotes_batch = []; // rastrea lotes ya vistos en este mismo Excel
 
     foreach ($body['rows'] as $row) {
-        $dni       = sanear($row['dni']         ?? '');
-        $nombres   = sanear($row['nombres']     ?? '');
-        $apellidos = sanear($row['apellidos']   ?? '');
-        $telefono  = sanear($row['telefono']    ?? '');
-        $correo    = sanear($row['correo']      ?? '');
-        $etapa     = sanear($row['etapa']       ?? '');
-        $manzana   = sanear($row['manzana']     ?? '');
-        $lote      = sanear($row['numero_lote'] ?? '');
+        $dni          = sanear($row['dni']          ?? '');
+        $nombres      = sanear($row['nombres']      ?? '');
+        $apellidos    = sanear($row['apellidos']    ?? '');
+        $telefono     = sanear($row['telefono']     ?? '');
+        $correo       = sanear($row['correo']       ?? '');
+        $fecha_compra = sanear($row['fecha_compra'] ?? '');
+        $etapa        = sanear($row['etapa']        ?? '');
+        $manzana      = sanear($row['manzana']      ?? '');
+        $lote         = sanear($row['numero_lote']  ?? '');
+
+        // Validar y normalizar fecha (YYYY-MM-DD)
+        $fecha_valida = '';
+        if (!empty($fecha_compra)) {
+            $d = DateTime::createFromFormat('Y-m-d', $fecha_compra);
+            if ($d && $d->format('Y-m-d') === $fecha_compra) {
+                $fecha_valida = $fecha_compra;
+            }
+        }
 
         $base = [
             'dni' => $dni, 'nombres' => $nombres, 'apellidos' => $apellidos,
             'telefono' => $telefono, 'correo' => $correo,
+            'fecha_compra' => $fecha_valida,
             'etapa' => $etapa, 'manzana' => $manzana, 'numero_lote' => $lote,
         ];
 
         // 1. Campos faltantes
         $faltantes = [];
-        if (empty($dni))       $faltantes[] = 'DNI';
-        if (empty($nombres))   $faltantes[] = 'Nombres';
-        if (empty($apellidos)) $faltantes[] = 'Apellidos';
-        if (empty($telefono))  $faltantes[] = 'Teléfono';
-        if (empty($correo))    $faltantes[] = 'Correo';
-        if (empty($etapa))     $faltantes[] = 'Etapa';
-        if (empty($manzana))   $faltantes[] = 'Manzana';
-        if (empty($lote))      $faltantes[] = 'Lote';
+        if (empty($dni))          $faltantes[] = 'DNI';
+        if (empty($nombres))      $faltantes[] = 'Nombres';
+        if (empty($apellidos))    $faltantes[] = 'Apellidos';
+        if (empty($telefono))     $faltantes[] = 'Teléfono';
+        if (empty($correo))       $faltantes[] = 'Correo';
+        if (empty($fecha_valida)) $faltantes[] = 'Fecha';
+        if (empty($etapa))        $faltantes[] = 'Etapa';
+        if (empty($manzana))      $faltantes[] = 'Manzana';
+        if (empty($lote))         $faltantes[] = 'Lote';
 
         if (!empty($faltantes)) {
             $filas[] = array_merge($base, ['estado' => 'incompleto', 'faltantes' => $faltantes]);
@@ -533,24 +582,29 @@ function importar() {
         exit;
     }
 
-    $modelo    = new Cliente();
-    $db        = Database::getInstance()->getConnection();
+    $modelo     = new Cliente();
+    $db         = Database::getInstance()->getConnection();
     $insertados = 0;
     $errores    = 0;
+    $detalle_errores = [];
 
     foreach ($body['rows'] as $row) {
-        $dni       = sanear($row['dni']         ?? '');
-        $nombres   = sanear($row['nombres']     ?? '');
-        $apellidos = sanear($row['apellidos']   ?? '');
-        $telefono  = sanear($row['telefono']    ?? '');
-        $correo    = sanear($row['correo']      ?? '');
-        $etapa     = sanear($row['etapa']       ?? '');
-        $manzana   = sanear($row['manzana']     ?? '');
-        $lote      = sanear($row['numero_lote'] ?? '');
+        $dni          = sanear($row['dni']          ?? '');
+        $nombres      = sanear($row['nombres']      ?? '');
+        $apellidos    = sanear($row['apellidos']    ?? '');
+        $telefono     = sanear($row['telefono']     ?? '');
+        $correo       = sanear($row['correo']       ?? '');
+        $fecha_compra = sanear($row['fecha_compra'] ?? '');
+        $etapa        = sanear($row['etapa']        ?? '');
+        $manzana      = sanear($row['manzana']      ?? '');
+        $lote         = sanear($row['numero_lote']  ?? '');
+
+        $identificador = "{$nombres} {$apellidos} (DNI {$dni}) Lote {$lote}";
 
         if (empty($dni) || empty($nombres) || empty($apellidos) || empty($telefono) ||
-            empty($correo) || empty($etapa) || empty($manzana) || empty($lote)) {
+            empty($correo) || empty($fecha_compra) || empty($etapa) || empty($manzana) || empty($lote)) {
             $errores++;
+            $detalle_errores[] = "Campos incompletos: {$identificador}";
             continue;
         }
 
@@ -561,15 +615,16 @@ function importar() {
 
         try {
             $id = $modelo->insertar([
-                'nombres'     => $nombres,
-                'apellidos'   => $apellidos,
-                'dni'         => $dni,
-                'telefono'    => $telefono,
-                'correo'      => $correo,
-                'numero_lote' => $lote,
-                'manzana'     => $manzana,
-                'etapa'       => $etapa,
-                'estado'      => 'activo',
+                'nombres'      => $nombres,
+                'apellidos'    => $apellidos,
+                'dni'          => $dni,
+                'telefono'     => $telefono,
+                'correo'       => $correo,
+                'fecha_compra' => $fecha_compra,
+                'numero_lote'  => $lote,
+                'manzana'      => $manzana,
+                'etapa'        => $etapa,
+                'estado'       => 'activo',
             ]);
 
             if ($id) {
@@ -578,16 +633,19 @@ function importar() {
                 $insertados++;
             } else {
                 $errores++;
+                $detalle_errores[] = "Error al insertar: {$identificador}";
             }
         } catch (Exception $e) {
             $errores++;
+            $detalle_errores[] = "Error en {$identificador}: " . $e->getMessage();
         }
     }
 
     echo json_encode([
-        'ok'         => true,
-        'insertados' => $insertados,
-        'errores'    => $errores,
+        'ok'              => true,
+        'insertados'      => $insertados,
+        'errores'         => $errores,
+        'detalle_errores' => $detalle_errores,
     ]);
     exit;
 }

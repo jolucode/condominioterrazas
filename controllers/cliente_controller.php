@@ -123,6 +123,7 @@ function listarClientes() {
                                 <th>Etapa</th>
                                 <th>Manzana</th>
                                 <th>Lote</th>
+                                <th>F. Compra</th>
                                 <th>Correo</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
@@ -135,9 +136,10 @@ function listarClientes() {
                                     <td><?php echo $cliente['nombres'] . ' ' . $cliente['apellidos']; ?></td>
                                     <td><?php echo $cliente['dni']; ?></td>
                                     <td><?php echo $cliente['telefono'] ?: '-'; ?></td>
-                                    <td><?php echo $cliente['etapa'] ?: '-'; ?></td>
-                                    <td><?php echo $cliente['manzana'] ?: '-'; ?></td>
+                                    <td><?php echo $cliente['etapa']    ?: '-'; ?></td>
+                                    <td><?php echo $cliente['manzana']  ?: '-'; ?></td>
                                     <td><?php echo $cliente['numero_lote']; ?></td>
+                                    <td><?php echo $cliente['fecha_compra'] ? formatearFecha($cliente['fecha_compra']) : '-'; ?></td>
                                     <td><?php echo $cliente['correo'] ?: '-'; ?></td>
                                     <td>
                                         <span class="badge <?php echo $cliente['estado'] === 'activo' ? 'badge-success' : 'badge-danger'; ?>">
@@ -301,6 +303,7 @@ function listarClientesAjax() {
                         <th>Etapa</th>
                         <th>Manzana</th>
                         <th>Lote</th>
+                        <th>F. Compra</th>
                         <th>Correo</th>
                         <th>Estado</th>
                         <th>Acciones</th>
@@ -316,6 +319,7 @@ function listarClientesAjax() {
                             <td><?php echo $cliente['etapa']    ?: '-'; ?></td>
                             <td><?php echo $cliente['manzana']  ?: '-'; ?></td>
                             <td><?php echo $cliente['numero_lote']; ?></td>
+                            <td><?php echo $cliente['fecha_compra'] ? formatearFecha($cliente['fecha_compra']) : '-'; ?></td>
                             <td><?php echo $cliente['correo']   ?: '-'; ?></td>
                             <td>
                                 <span class="badge <?php echo $cliente['estado'] === 'activo' ? 'badge-success' : 'badge-danger'; ?>">
@@ -419,18 +423,20 @@ function crearCliente() {
                 $db->beginTransaction();
                 
                 // Insertar cliente
+                $fecha_compra = sanear($_POST['fecha_compra'] ?? '');
                 $datos_cliente = [
-                    'nombres' => $nombres,
-                    'apellidos' => $apellidos,
-                    'dni' => $dni,
-                    'ruc' => $ruc ?: null,
-                    'telefono' => $telefono,
-                    'correo' => $correo ?: null,
-                    'direccion' => $direccion,
-                    'numero_lote' => $numero_lote,
-                    'manzana' => $manzana,
-                    'etapa' => $etapa,
-                    'estado' => $estado
+                    'nombres'      => $nombres,
+                    'apellidos'    => $apellidos,
+                    'dni'          => $dni,
+                    'ruc'          => $ruc ?: null,
+                    'telefono'     => $telefono,
+                    'correo'       => $correo ?: null,
+                    'direccion'    => $direccion,
+                    'fecha_compra' => $fecha_compra ?: null,
+                    'numero_lote'  => $numero_lote,
+                    'manzana'      => $manzana,
+                    'etapa'        => $etapa,
+                    'estado'       => $estado,
                 ];
                 
                 $cliente_id = $modelo_cliente->insertar($datos_cliente);
@@ -548,7 +554,15 @@ function crearCliente() {
                                value="<?php echo isset($_POST['direccion']) ? $_POST['direccion'] : ''; ?>">
                     </div>
                 </div>
-                
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Compra</label>
+                        <input type="date" name="fecha_compra" class="form-control"
+                               value="<?php echo isset($_POST['fecha_compra']) ? $_POST['fecha_compra'] : ''; ?>">
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Estado</label>
                     <select name="estado" class="form-control">
@@ -638,18 +652,20 @@ function editarCliente() {
         if ($correo && !esEmailValido($correo)) $errores[] = 'El correo no es válido';
         
         if (empty($errores)) {
+            $fecha_compra = sanear($_POST['fecha_compra'] ?? '');
             $datos = [
-                'nombres' => $nombres,
-                'apellidos' => $apellidos,
-                'dni' => $dni,
-                'ruc' => $ruc ?: null,
-                'telefono' => $telefono,
-                'correo' => $correo ?: null,
-                'direccion' => $direccion,
-                'numero_lote' => $numero_lote,
-                'manzana' => $manzana,
-                'etapa' => $etapa,
-                'estado' => $estado
+                'nombres'      => $nombres,
+                'apellidos'    => $apellidos,
+                'dni'          => $dni,
+                'ruc'          => $ruc ?: null,
+                'telefono'     => $telefono,
+                'correo'       => $correo ?: null,
+                'direccion'    => $direccion,
+                'fecha_compra' => $fecha_compra ?: null,
+                'numero_lote'  => $numero_lote,
+                'manzana'      => $manzana,
+                'etapa'        => $etapa,
+                'estado'       => $estado,
             ];
             
             if ($modelo_cliente->actualizar($id, $datos)) {
@@ -751,6 +767,15 @@ function editarCliente() {
                                value="<?php echo $cliente['direccion'] ?: ''; ?>">
                     </div>
                 </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Compra</label>
+                        <input type="date" name="fecha_compra" class="form-control"
+                               value="<?php echo $cliente['fecha_compra'] ?: ''; ?>">
+                    </div>
+                </div>
+
                 
                 <div class="form-group">
                     <label>Estado</label>
@@ -854,6 +879,8 @@ function verCliente() {
                         <span class="value"><?php echo $cliente['numero_lote']; ?></span></li>
                     <li><span class="label">Manzana</span>
                         <span class="value"><?php echo $cliente['manzana'] ?: '-'; ?></span></li>
+                    <li><span class="label">Fecha de Compra</span>
+                        <span class="value"><?php echo $cliente['fecha_compra'] ? formatearFecha($cliente['fecha_compra']) : '-'; ?></span></li>
                     <li><span class="label">Etapa</span>
                         <span class="value"><?php echo $cliente['etapa'] ?: '-'; ?></span></li>
                     <li><span class="label">Estado</span>

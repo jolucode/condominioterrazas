@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     telefono VARCHAR(20) NULL,
     correo VARCHAR(100) NULL,
     direccion VARCHAR(200) NULL,
+    fecha_compra DATE NULL,
     numero_lote VARCHAR(20) NOT NULL,
     manzana VARCHAR(10) NULL,
     etapa VARCHAR(50) NULL,
