@@ -23,6 +23,12 @@ function mostrarFormulario() {
 
     ob_start(); ?>
 
+    <style>
+    @media (max-width: 700px) {
+        .import-info-grid { grid-template-columns: 1fr !important; }
+    }
+    </style>
+
     <div class="card mb-3">
         <div class="card-header">
             <h3><i class="fas fa-file-excel"></i> Importar Clientes desde Excel</h3>
@@ -33,19 +39,91 @@ function mostrarFormulario() {
         </div>
         <div class="card-body">
 
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i>
-                <strong>Formato esperado:</strong> Archivo <code>.xlsx</code>,
-                hoja llamada <strong>propietarios</strong> (o la primera hoja),
-                con estas columnas en orden:
-                <br><br>
-                <code>A: DNI &nbsp;|&nbsp; B: Nombres &nbsp;|&nbsp; C: Apellidos &nbsp;|&nbsp;
-                      D: Teléfono &nbsp;|&nbsp; E: Correo &nbsp;|&nbsp;
-                      F: Etapa &nbsp;|&nbsp; G: Manzana &nbsp;|&nbsp; H: Lote</code>
-                <br><br>
-                <i class="fas fa-check-circle" style="color:var(--color-exito)"></i>
-                Si un propietario ya existe con el mismo <strong>DNI + Lote + Manzana + Etapa</strong>,
-                se omitirá automáticamente. Solo se insertarán los registros nuevos.
+            <!-- Instrucciones de formato -->
+            <div class="import-info-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+
+                <!-- Card: estructura del archivo -->
+                <div style="background:var(--color-fondo);border:1px solid var(--color-borde);
+                            border-radius:var(--radio);padding:1.25rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;">
+                        <i class="fas fa-table" style="color:var(--color-primario);font-size:1.1rem;"></i>
+                        <strong>Estructura del archivo</strong>
+                    </div>
+                    <p style="font-size:.85rem;color:var(--color-texto-claro);margin:0 0 .75rem;">
+                        Hoja: <code>propietarios</code> (o la primera hoja) &nbsp;·&nbsp; Formato: <code>.xlsx</code>
+                    </p>
+                    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                        <thead>
+                            <tr style="background:var(--color-primario);color:#fff;">
+                                <th style="padding:.35rem .6rem;text-align:center;border-radius:4px 0 0 0;width:40px;">Col.</th>
+                                <th style="padding:.35rem .6rem;text-align:left;">Campo</th>
+                                <th style="padding:.35rem .6rem;text-align:center;border-radius:0 4px 0 0;">¿Req.?</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $cols = [
+                                ['A', 'DNI',       true],
+                                ['B', 'Nombres',   true],
+                                ['C', 'Apellidos', true],
+                                ['D', 'Teléfono',  true],
+                                ['E', 'Correo',    true],
+                                ['F', 'Etapa',     true],
+                                ['G', 'Manzana',   true],
+                                ['H', 'Lote',      true],
+                            ];
+                            foreach ($cols as $i => [$col, $campo, $req]):
+                                $bg = $i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,.03)';
+                            ?>
+                            <tr style="background:<?php echo $bg; ?>">
+                                <td style="padding:.3rem .6rem;text-align:center;">
+                                    <span style="display:inline-block;width:22px;height:22px;line-height:22px;
+                                                 text-align:center;background:var(--color-primario);color:#fff;
+                                                 border-radius:4px;font-weight:700;font-size:.8rem;">
+                                        <?php echo $col; ?>
+                                    </span>
+                                </td>
+                                <td style="padding:.3rem .6rem;font-weight:500;"><?php echo $campo; ?></td>
+                                <td style="padding:.3rem .6rem;text-align:center;">
+                                    <?php if ($req): ?>
+                                        <span style="color:var(--color-peligro);font-size:.75rem;font-weight:600;">Sí</span>
+                                    <?php else: ?>
+                                        <span style="color:var(--color-texto-claro);font-size:.75rem;">No</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Card: reglas de importación -->
+                <div style="background:var(--color-fondo);border:1px solid var(--color-borde);
+                            border-radius:var(--radio);padding:1.25rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;">
+                        <i class="fas fa-shield-alt" style="color:var(--color-exito);font-size:1.1rem;"></i>
+                        <strong>Reglas de importación</strong>
+                    </div>
+                    <ul style="list-style:none;padding:0;margin:0;font-size:.9rem;display:flex;flex-direction:column;gap:.75rem;">
+                        <li style="display:flex;gap:.6rem;align-items:flex-start;">
+                            <i class="fas fa-check-circle" style="color:var(--color-exito);margin-top:2px;flex-shrink:0;"></i>
+                            <span>Un propietario puede tener <strong>varios lotes</strong>. El mismo DNI aparece tantas veces como lotes tenga.</span>
+                        </li>
+                        <li style="display:flex;gap:.6rem;align-items:flex-start;">
+                            <i class="fas fa-ban" style="color:var(--color-peligro);margin-top:2px;flex-shrink:0;"></i>
+                            <span>Un <strong>lote físico</strong> (Lote + Manzana + Etapa) solo puede tener <strong>un propietario</strong>. Si ya existe, se omite.</span>
+                        </li>
+                        <li style="display:flex;gap:.6rem;align-items:flex-start;">
+                            <i class="fas fa-sync-alt" style="color:var(--color-info);margin-top:2px;flex-shrink:0;"></i>
+                            <span>Puedes reimportar el mismo Excel cuantas veces quieras. Solo se insertarán los <strong>registros nuevos</strong>.</span>
+                        </li>
+                        <li style="display:flex;gap:.6rem;align-items:flex-start;">
+                            <i class="fas fa-eye" style="color:var(--color-advertencia);margin-top:2px;flex-shrink:0;"></i>
+                            <span>Siempre verás una <strong>previsualización</strong> con colores antes de confirmar la importación.</span>
+                        </li>
+                    </ul>
+                </div>
+
             </div>
 
             <!-- Zona de carga -->
@@ -234,14 +312,30 @@ function mostrarFormulario() {
 
         function renderPreview(data) {
             tbody.innerHTML = '';
-            let nuevos = 0, existentes = 0;
+            let nuevos = 0, existentes = 0, incompletos = 0;
 
             data.rows.forEach((row, i) => {
                 const tr = document.createElement('tr');
-                const esNuevo = row.estado === 'nuevo';
-                if (esNuevo) nuevos++; else existentes++;
+                const esNuevo      = row.estado === 'nuevo';
+                const esExiste     = row.estado === 'existe';
+                const esIncompleto = row.estado === 'incompleto';
 
-                tr.style.background = esNuevo ? '' : 'rgba(255,193,7,.08)';
+                if (esNuevo)      nuevos++;
+                if (esExiste)     existentes++;
+                if (esIncompleto) incompletos++;
+
+                if (esIncompleto)  tr.style.background = 'rgba(211,47,47,.06)';
+                else if (esExiste) tr.style.background = 'rgba(255,193,7,.08)';
+
+                const faltanStr = (row.faltantes && row.faltantes.length)
+                    ? `<br><small style="color:var(--color-peligro);">Falta: ${row.faltantes.map(f => esc(f)).join(', ')}</small>`
+                    : '';
+
+                let badgeEstado;
+                if (esNuevo)      badgeEstado = '<span class="badge badge-success">Nuevo</span>';
+                else if (esExiste) badgeEstado = '<span class="badge badge-warning">Ya existe</span>';
+                else               badgeEstado = `<span class="badge badge-danger">Incompleto</span>${faltanStr}`;
+
                 tr.innerHTML = `
                     <td>${i + 1}</td>
                     <td>${esc(row.dni)}</td>
@@ -252,27 +346,27 @@ function mostrarFormulario() {
                     <td>${esc(row.etapa)}</td>
                     <td>${esc(row.manzana)}</td>
                     <td>${esc(row.numero_lote)}</td>
-                    <td>${esNuevo
-                        ? '<span class="badge badge-success">Nuevo</span>'
-                        : '<span class="badge badge-warning">Ya existe</span>'}</td>`;
+                    <td>${badgeEstado}</td>`;
                 tbody.appendChild(tr);
             });
 
             // Resumen
             resumen.style.display = 'block';
-            resumen.innerHTML = `
-                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
-                    <div style="padding:.75rem 1.25rem;background:var(--color-exito-claro,#e8f5e9);
-                                border-radius:var(--radio);display:flex;align-items:center;gap:.5rem;">
-                        <i class="fas fa-check-circle" style="color:var(--color-exito);"></i>
-                        <span><strong>${nuevos}</strong> nuevos a insertar</span>
-                    </div>
-                    <div style="padding:.75rem 1.25rem;background:#fff8e1;
-                                border-radius:var(--radio);display:flex;align-items:center;gap:.5rem;">
-                        <i class="fas fa-minus-circle" style="color:var(--color-advertencia);"></i>
-                        <span><strong>${existentes}</strong> ya tienen ese lote registrado (se omitirán)</span>
-                    </div>
-                </div>`;
+            resumen.innerHTML = `<div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                <div style="padding:.75rem 1.25rem;background:#e8f5e9;border-radius:var(--radio);display:flex;align-items:center;gap:.5rem;">
+                    <i class="fas fa-check-circle" style="color:var(--color-exito);"></i>
+                    <span><strong>${nuevos}</strong> nuevos a insertar</span>
+                </div>
+                <div style="padding:.75rem 1.25rem;background:#fff8e1;border-radius:var(--radio);display:flex;align-items:center;gap:.5rem;">
+                    <i class="fas fa-minus-circle" style="color:var(--color-advertencia);"></i>
+                    <span><strong>${existentes}</strong> ya tienen ese lote (se omitirán)</span>
+                </div>
+                ${incompletos > 0 ? `
+                <div style="padding:.75rem 1.25rem;background:#ffebee;border-radius:var(--radio);display:flex;align-items:center;gap:.5rem;">
+                    <i class="fas fa-exclamation-circle" style="color:var(--color-peligro);"></i>
+                    <span><strong>${incompletos}</strong> con campos faltantes (no se insertarán)</span>
+                </div>` : ''}
+            </div>`;
 
             preview.style.display = 'block';
             btnImportar.disabled  = nuevos === 0;
@@ -372,9 +466,34 @@ function previsualizar() {
         $manzana    = sanear($row['manzana']     ?? '');
         $lote       = sanear($row['numero_lote'] ?? '');
 
-        if (empty($dni) || empty($nombres) || empty($apellidos) || empty($lote)) continue;
+        // Detectar campos faltantes
+        $faltantes = [];
+        if (empty($dni))      $faltantes[] = 'DNI';
+        if (empty($nombres))  $faltantes[] = 'Nombres';
+        if (empty($apellidos))$faltantes[] = 'Apellidos';
+        if (empty($telefono)) $faltantes[] = 'Teléfono';
+        if (empty($correo))   $faltantes[] = 'Correo';
+        if (empty($etapa))    $faltantes[] = 'Etapa';
+        if (empty($manzana))  $faltantes[] = 'Manzana';
+        if (empty($lote))     $faltantes[] = 'Lote';
 
-        $existe = $modelo->loteExiste($lote, $manzana ?: null, $etapa ?: null);
+        if (!empty($faltantes)) {
+            $filas[] = [
+                'dni'         => $dni,
+                'nombres'     => $nombres,
+                'apellidos'   => $apellidos,
+                'telefono'    => $telefono,
+                'correo'      => $correo,
+                'etapa'       => $etapa,
+                'manzana'     => $manzana,
+                'numero_lote' => $lote,
+                'estado'      => 'incompleto',
+                'faltantes'   => $faltantes,
+            ];
+            continue;
+        }
+
+        $existe = $modelo->loteExiste($lote, $manzana, $etapa);
 
         $filas[] = [
             'dni'         => $dni,
@@ -386,6 +505,7 @@ function previsualizar() {
             'manzana'     => $manzana,
             'numero_lote' => $lote,
             'estado'      => $existe ? 'existe' : 'nuevo',
+            'faltantes'   => [],
         ];
     }
 
@@ -425,13 +545,14 @@ function importar() {
         $manzana   = sanear($row['manzana']     ?? '');
         $lote      = sanear($row['numero_lote'] ?? '');
 
-        if (empty($dni) || empty($nombres) || empty($apellidos) || empty($lote)) {
+        if (empty($dni) || empty($nombres) || empty($apellidos) || empty($telefono) ||
+            empty($correo) || empty($etapa) || empty($manzana) || empty($lote)) {
             $errores++;
             continue;
         }
 
         // Doble verificación por si acaso
-        if ($modelo->loteExiste($lote, $manzana ?: null, $etapa ?: null)) {
+        if ($modelo->loteExiste($lote, $manzana, $etapa)) {
             continue;
         }
 
@@ -440,11 +561,11 @@ function importar() {
                 'nombres'     => $nombres,
                 'apellidos'   => $apellidos,
                 'dni'         => $dni,
-                'telefono'    => $telefono ?: null,
-                'correo'      => $correo   ?: null,
+                'telefono'    => $telefono,
+                'correo'      => $correo,
                 'numero_lote' => $lote,
-                'manzana'     => $manzana  ?: null,
-                'etapa'       => $etapa    ?: null,
+                'manzana'     => $manzana,
+                'etapa'       => $etapa,
                 'estado'      => 'activo',
             ]);
 
