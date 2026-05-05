@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo generarTokenCSRF(); ?>">
     <title><?php echo isset($titulo) ? $titulo . ' - ' : ''; ?><?php echo APP_NAME; ?></title>
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/styles.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/styles.css?v=2.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -33,6 +34,12 @@
                     </div>
                 </div>
                 <div class="topbar-right">
+                    <button class="btn btn-outline btn-sm" id="theme-toggle"
+                            aria-label="Cambiar Tema Oscuro/Claro"
+                            style="padding:0.5rem 0.6rem;border-radius:50%;border:none;font-size:1.1rem;"
+                            title="Tema Oscuro">
+                        <i class="fas fa-moon"></i>
+                    </button>
                     <a href="<?php echo APP_URL; ?>/controllers/auth_controller.php?accion=cerrar" class="btn btn-outline btn-sm">
                         <i class="fas fa-sign-out-alt"></i> Salir
                     </a>
