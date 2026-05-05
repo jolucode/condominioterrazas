@@ -349,12 +349,13 @@ function editarUsuario() {
 
 function eliminarUsuario() {
     $id = intval($_GET['id'] ?? 0);
-    
+    $modelo_usuario = new Usuario();
+
     if ($id == $_SESSION['usuario_id']) {
         setFlashMessage('error', 'No puede eliminar su propio usuario');
         redirigir('controllers/usuario_controller.php?accion=listar');
     }
-    
+
     if ($modelo_usuario->eliminar($id)) {
         setFlashMessage('success', 'Usuario eliminado exitosamente');
     } else {
