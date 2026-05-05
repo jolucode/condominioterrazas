@@ -214,9 +214,10 @@ function mostrarFormulario() {
         }
 
         function verificarDuplicados(rows) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             fetch(`${baseUrl}/controllers/importar_controller.php?accion=previsualizar`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ rows })
             })
             .then(r => r.json())
@@ -287,9 +288,10 @@ function mostrarFormulario() {
             btnImportar.disabled = true;
             btnImportar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
 
+            const csrfToken2 = document.querySelector('meta[name="csrf-token"]')?.content || '';
             fetch(`${baseUrl}/controllers/importar_controller.php?accion=importar`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken2 },
                 body: JSON.stringify({ rows: nuevos })
             })
             .then(r => r.json())
@@ -395,8 +397,11 @@ function previsualizar() {
 function importar() {
     header('Content-Type: application/json');
 
-    if (!validarTokenCSRF($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '') === false) {
-        // CSRF via header opcional — seguimos sin bloquear (viene de JS fetch interno)
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!validarTokenCSRF($token)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'mensaje' => 'Token de seguridad inválido.']);
+        exit;
     }
 
     $body = json_decode(file_get_contents('php://input'), true);

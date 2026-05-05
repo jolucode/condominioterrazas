@@ -180,68 +180,39 @@ function emitirComprobante() {
         
         if (empty($errores)) {
             $modelo_cliente = new Cliente();
-            $cliente = $modelo_cliente->obtenerPorId($pago['cliente_id']);
-            
-            // Generar numeración
-            $numeracion = $modelo_comprobante->generarNumero($tipo_comprobante);
-            
-            // Determinar DNI o RUC
-            $dni_ruc = $cliente['ruc'] ?: $cliente['dni'];
-            
-            // Concepto
-            $concepto = 'Pago de mantenimiento mensual - ' . nombreMes($pago['mes']) . ' ' . $pago['anio'];
-            
-            // ============================================
-            // INTEGRACIÓN CON SUNAT (PREPARADO)
-            // ============================================
-            // Aquí se conecta con la API de SUNAT o servicio externo
-            // Por ahora, simulamos la emisión exitosa
-            //
-            // EJEMPLO DE INTEGRACIÓN REAL:
-            // 
-            // $sunat = new SunatAPI();
-            // $resultado = $sunat->emitirComprobante([
-            //     'tipo_comprobante' => $tipo_comprobante,
-            //     'cliente_tipo_doc' => $cliente['ruc'] ? '6' : '1', // 6=RUC, 1=DNI
-            //     'cliente_numero_doc' => $dni_ruc,
-            //     'cliente_nombre' => $cliente['nombres'] . ' ' . $cliente['apellidos'],
-            //     'monto' => $pago['monto'],
-            //     'concepto' => $concepto
-            // ]);
-            //
-            // if ($resultado['success']) {
-            //     $sunat_hash = $resultado['hash'];
-            //     $estado_emision = 'emitido';
-            // } else {
-            //     $errores[] = 'Error al emitir comprobante en SUNAT: ' . $resultado['error'];
-            // }
-            // ============================================
-            
-            // Simulación de emisión exitosa
-            $sunat_hash = bin2hex(random_bytes(16)); // Hash simulado
-            $estado_emision = 'emitido';
-            
+            $cliente        = $modelo_cliente->obtenerPorId($pago['cliente_id']);
+            $dni_ruc        = $cliente['ruc'] ?: $cliente['dni'];
+
+            // Concepto según tipo de pago
+            if ($pago['tipo_pago'] === 'inscripcion') {
+                $concepto = 'Inscripción / Empadronamiento';
+            } elseif ($pago['tipo_pago'] === 'membresia_cuota') {
+                $concepto = 'Membresía Perpetua Club — Cuota ' . $pago['cuota_numero'] . ' de ' . $pago['total_cuotas'];
+            } else {
+                $concepto = 'Mantenimiento mensual - ' . nombreMes($pago['mes']) . ' ' . $pago['anio'];
+            }
+
+            // Datos del comprobante — la numeración se reserva atómicamente dentro de crearComprobante()
             $datos_comprobante = [
-                'pago_id' => $pago_id,
+                'pago_id'          => $pago_id,
                 'tipo_comprobante' => $tipo_comprobante,
-                'serie' => $numeracion['serie'],
-                'numero' => $numeracion['numero'],
-                'numero_actual' => $numeracion['numero_actual'],
-                'cliente_id' => $pago['cliente_id'],
-                'dni_ruc' => $dni_ruc,
-                'concepto' => $concepto,
-                'monto' => $pago['monto'],
-                'fecha_emision' => date('Y-m-d H:i:s'),
-                'estado_emision' => $estado_emision,
-                'sunat_hash' => $sunat_hash
+                'cliente_id'       => $pago['cliente_id'],
+                'dni_ruc'          => $dni_ruc,
+                'concepto'         => $concepto,
+                'monto'            => $pago['monto'],
+                'fecha_emision'    => date('Y-m-d H:i:s'),
+                'estado_emision'   => 'emitido',
+                'sunat_hash'       => bin2hex(random_bytes(16)),
             ];
-            
+
             $comprobante_id = $modelo_comprobante->crearComprobante($datos_comprobante);
-            
+
             if ($comprobante_id) {
-                $db = Database::getInstance()->getConnection();
-                registrarAuditoria($db, 'create', 'comprobantes', $comprobante_id, 
-                    "Comprobante emitido: {$tipo_comprobante} {$numeracion['serie']}-{$numeracion['numero']}");
+                $db         = Database::getInstance()->getConnection();
+                $comprobante_nuevo = $modelo_comprobante->obtenerPorId($comprobante_id);
+                $num_ref    = ($comprobante_nuevo['serie'] ?? '') . '-' . ($comprobante_nuevo['numero'] ?? '');
+                registrarAuditoria($db, 'create', 'comprobantes', $comprobante_id,
+                    "Comprobante emitido: {$tipo_comprobante} {$num_ref}");
                 setFlashMessage('success', 'Comprobante emitido exitosamente');
                 redirigir('controllers/comprobante_controller.php?accion=ver&id=' . $comprobante_id);
             } else {

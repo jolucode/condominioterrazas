@@ -145,12 +145,14 @@ class Pago extends ModeloBase {
     }
     
     /**
-     * Actualizar estados vencidos (IMPORTANTE: InfinityFree no permite Stored Procedures)
+     * Actualizar estados vencidos — solo afecta registros pendientes con fecha pasada.
+     * El WHERE estado='pendiente' + INDEX idx_estado reduce el scan drásticamente.
      */
     public function actualizarEstadosVencidos() {
-        $sql = "UPDATE {$this->tabla} 
-                SET estado = 'vencido' 
-                WHERE estado = 'pendiente' 
+        $sql = "UPDATE {$this->tabla}
+                SET estado = 'vencido'
+                WHERE estado = 'pendiente'
+                AND fecha_vencimiento IS NOT NULL
                 AND fecha_vencimiento < CURDATE()";
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
@@ -269,27 +271,41 @@ class Pago extends ModeloBase {
     public function generarCuotasMembresia($cliente_id, $monto_cuota, $total_cuotas, $registrado_por = null) {
         $creadas = 0;
 
-        // Obtener cuotas ya existentes
-        $stmt = $this->db->prepare(
-            "SELECT MAX(cuota_numero) as ultima FROM {$this->tabla}
-             WHERE cliente_id = :cid AND tipo_pago = 'membresia_cuota'"
-        );
-        $stmt->execute([':cid' => $cliente_id]);
-        $ultima = intval($stmt->fetch()['ultima']);
+        try {
+            $this->db->beginTransaction();
 
-        for ($n = $ultima + 1; $n <= $total_cuotas; $n++) {
-            $fecha_venc = date('Y-m-t', mktime(0, 0, 0, date('n') + ($n - $ultima - 1), 1, date('Y')));
-            $this->insertar([
-                'cliente_id'    => $cliente_id,
-                'tipo_pago'     => 'membresia_cuota',
-                'cuota_numero'  => $n,
-                'total_cuotas'  => $total_cuotas,
-                'monto'         => $monto_cuota,
-                'fecha_vencimiento' => $fecha_venc,
-                'estado'        => 'pendiente',
-                'registrado_por' => $registrado_por,
-            ]);
-            $creadas++;
+            // SELECT FOR UPDATE evita que dos procesos lean el mismo MAX simultáneamente
+            $stmt = $this->db->prepare(
+                "SELECT MAX(cuota_numero) as ultima FROM {$this->tabla}
+                 WHERE cliente_id = :cid AND tipo_pago = 'membresia_cuota'
+                 FOR UPDATE"
+            );
+            $stmt->execute([':cid' => $cliente_id]);
+            $ultima = intval($stmt->fetch()['ultima']);
+
+            for ($n = $ultima + 1; $n <= $total_cuotas; $n++) {
+                $fecha_venc = date('Y-m-t', mktime(0, 0, 0, date('n') + ($n - $ultima - 1), 1, date('Y')));
+                try {
+                    $this->insertar([
+                        'cliente_id'        => $cliente_id,
+                        'tipo_pago'         => 'membresia_cuota',
+                        'cuota_numero'      => $n,
+                        'total_cuotas'      => $total_cuotas,
+                        'monto'             => $monto_cuota,
+                        'fecha_vencimiento' => $fecha_venc,
+                        'estado'            => 'pendiente',
+                        'registrado_por'    => $registrado_por,
+                    ]);
+                    $creadas++;
+                } catch (PDOException $e) {
+                    if ($e->getCode() !== '23000') throw $e;
+                }
+            }
+
+            $this->db->commit();
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            error_log('Error generarCuotasMembresia: ' . $e->getMessage());
         }
 
         return $creadas;

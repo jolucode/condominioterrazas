@@ -9,49 +9,72 @@ class Comprobante extends ModeloBase {
     protected $tabla = 'comprobantes';
     
     /**
-     * Generar siguiente número de comprobante
-     */
-    public function generarNumero($tipo_comprobante) {
-        $campo_numero = $tipo_comprobante === 'boleta' ? 'numero_boleta' : 'numero_factura';
-        $campo_serie = $tipo_comprobante === 'boleta' ? 'serie_boleta' : 'serie_factura';
-        
-        $serie = getConfig($campo_serie, $this->db);
-        $numero_actual = intval(getConfig($campo_numero, $this->db));
-        $nuevo_numero = $numero_actual + 1;
-        
-        // Formatear con ceros a la izquierda
-        $numero_formateado = str_pad($nuevo_numero, 8, '0', STR_PAD_LEFT);
-        
-        return [
-            'serie' => $serie,
-            'numero' => $numero_formateado,
-            'numero_actual' => $nuevo_numero
-        ];
-    }
-    
-    /**
-     * Crear comprobante
+     * Crear comprobante con numeración atómica (evita race condition)
+     * Lee y actualiza el contador dentro de la misma transacción con SELECT FOR UPDATE
      */
     public function crearComprobante($datos) {
         $db = $this->db;
-        
+
         try {
             $db->beginTransaction();
-            
-            // Insertar comprobante
-            $comprobante_id = $this->insertar($datos);
-            
-            // Actualizar contador
+
             $campo_numero = $datos['tipo_comprobante'] === 'boleta' ? 'numero_boleta' : 'numero_factura';
-            setConfig($campo_numero, $datos['numero_actual'], $db);
-            
+            $campo_serie  = $datos['tipo_comprobante'] === 'boleta' ? 'serie_boleta'  : 'serie_factura';
+
+            // SELECT FOR UPDATE bloquea la fila hasta que se haga commit/rollback
+            // Garantiza que ningún otro proceso lea el mismo número concurrentemente
+            $stmt = $db->prepare(
+                "SELECT valor FROM configuracion WHERE clave = :clave FOR UPDATE"
+            );
+            $stmt->execute([':clave' => $campo_numero]);
+            $numero_actual = intval($stmt->fetchColumn() ?? 0);
+            $nuevo_numero  = $numero_actual + 1;
+
+            $stmt_serie = $db->prepare(
+                "SELECT valor FROM configuracion WHERE clave = :clave"
+            );
+            $stmt_serie->execute([':clave' => $campo_serie]);
+            $serie = $stmt_serie->fetchColumn() ?: 'B001';
+
+            // Actualizar contador dentro de la transacción
+            $db->prepare("UPDATE configuracion SET valor = :v WHERE clave = :c")
+               ->execute([':v' => $nuevo_numero, ':c' => $campo_numero]);
+
+            // Insertar comprobante con número ya reservado
+            $datos['serie']         = $serie;
+            $datos['numero']        = str_pad($nuevo_numero, 8, '0', STR_PAD_LEFT);
+            $datos['numero_actual'] = $nuevo_numero;
+            unset($datos['numero_actual']); // no es columna de BD
+
+            $comprobante_id = $this->insertar($datos);
+
             $db->commit();
             return $comprobante_id;
-            
+
         } catch (Exception $e) {
             $db->rollBack();
+            error_log('Error crearComprobante: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Generar número de comprobante (solo para previsualización, sin reservar)
+     * Para emitir usa crearComprobante() que reserva el número atómicamente
+     */
+    public function generarNumero($tipo_comprobante) {
+        $campo_numero = $tipo_comprobante === 'boleta' ? 'numero_boleta' : 'numero_factura';
+        $campo_serie  = $tipo_comprobante === 'boleta' ? 'serie_boleta'  : 'serie_factura';
+
+        $serie        = getConfig($campo_serie,  $this->db);
+        $numero_actual = intval(getConfig($campo_numero, $this->db));
+        $nuevo_numero  = $numero_actual + 1;
+
+        return [
+            'serie'          => $serie,
+            'numero'         => str_pad($nuevo_numero, 8, '0', STR_PAD_LEFT),
+            'numero_actual'  => $nuevo_numero,
+        ];
     }
     
     /**
