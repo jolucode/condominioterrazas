@@ -27,11 +27,18 @@
                                 <i class="fas fa-image fa-3x"></i>
                             </div>
                         <?php else: ?>
-                            <?php foreach ($avance['imagenes'] as $img): ?>
+                            <?php
+                            // Construir array JS de URLs para este avance
+                            $urls_js = implode("','", array_map(
+                                fn($i) => APP_URL . '/' . $i['ruta_imagen'],
+                                $avance['imagenes']
+                            ));
+                        ?>
+                        <?php foreach ($avance['imagenes'] as $imgIdx => $img): ?>
                                 <div class="slide" style="min-width: 100%; height: 100%;">
-                                    <img src="<?php echo APP_URL . '/' . $img['ruta_imagen']; ?>" 
+                                    <img src="<?php echo APP_URL . '/' . $img['ruta_imagen']; ?>"
                                          style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
-                                         onclick="openLightbox('<?php echo APP_URL . '/' . $img['ruta_imagen']; ?>')">
+                                         onclick="openLightbox(['<?php echo $urls_js; ?>'], <?php echo $imgIdx; ?>)">
                                 </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -80,52 +87,149 @@
     </div>
 <?php endif; ?>
 
-<!-- Lightbox Modal -->
-<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; cursor: pointer;" onclick="this.style.display='none'">
-    <img id="lightbox-img" src="" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.5);">
-    <span style="position: absolute; top: 20px; right: 20px; color: #fff; font-size: 2rem;">&times;</span>
+<!-- Lightbox con carrusel -->
+<div id="lightbox"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);
+            z-index:9999;justify-content:center;align-items:center;flex-direction:column;">
+
+    <!-- Cerrar -->
+    <button onclick="closeLightbox()"
+            style="position:absolute;top:16px;right:20px;background:none;border:none;
+                   color:#fff;font-size:2rem;cursor:pointer;line-height:1;z-index:10;"
+            title="Cerrar (Esc)">&times;</button>
+
+    <!-- Contador -->
+    <div id="lb-counter"
+         style="position:absolute;top:18px;left:50%;transform:translateX(-50%);
+                color:rgba(255,255,255,.75);font-size:.9rem;letter-spacing:.05em;"></div>
+
+    <!-- Imagen -->
+    <img id="lightbox-img" src=""
+         style="max-width:92vw;max-height:85vh;object-fit:contain;
+                border-radius:6px;box-shadow:0 0 40px rgba(0,0,0,.6);
+                user-select:none;transition:opacity .15s;">
+
+    <!-- Flecha izquierda -->
+    <button id="lb-prev" onclick="lightboxMove(-1)"
+            style="position:absolute;left:12px;top:50%;transform:translateY(-50%);
+                   background:rgba(255,255,255,.15);border:none;color:#fff;
+                   width:46px;height:46px;border-radius:50%;font-size:1.2rem;
+                   cursor:pointer;display:flex;align-items:center;justify-content:center;
+                   transition:background .2s;"
+            onmouseover="this.style.background='rgba(255,255,255,.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,.15)'"
+            title="Anterior (←)">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+
+    <!-- Flecha derecha -->
+    <button id="lb-next" onclick="lightboxMove(1)"
+            style="position:absolute;right:12px;top:50%;transform:translateY(-50%);
+                   background:rgba(255,255,255,.15);border:none;color:#fff;
+                   width:46px;height:46px;border-radius:50%;font-size:1.2rem;
+                   cursor:pointer;display:flex;align-items:center;justify-content:center;
+                   transition:background .2s;"
+            onmouseover="this.style.background='rgba(255,255,255,.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,.15)'"
+            title="Siguiente (→)">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+
+    <!-- Miniaturas -->
+    <div id="lb-thumbs"
+         style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+                display:flex;gap:6px;max-width:90vw;overflow-x:auto;padding:4px 0;"></div>
 </div>
 
 <style>
-.avance-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.12);
-}
-.dot.active {
-    background: #fff !important;
-    width: 20px !important;
-    border-radius: 10px !important;
-}
-.carousel-btn:hover {
-    background: var(--color-primario) !important;
-}
+.avance-card:hover { transform:translateY(-8px); box-shadow:0 15px 30px rgba(0,0,0,.12); }
+.dot.active { background:#fff !important; width:20px !important; border-radius:10px !important; }
+.carousel-btn:hover { background:var(--color-primario) !important; }
+#lightbox img { pointer-events:none; }
 </style>
 
 <script>
-    const carouselStates = {};
+// ── Carrusel de tarjetas ──
+const carouselStates = {};
+function moveCarousel(id, direction) {
+    if (!carouselStates[id]) carouselStates[id] = 0;
+    const container  = document.getElementById(`carousel-${id}`);
+    const slides     = container.querySelector('.carousel-slides');
+    const dots       = container.querySelectorAll('.dot');
+    const slideCount = slides.querySelectorAll('.slide').length;
+    carouselStates[id] = (carouselStates[id] + direction + slideCount) % slideCount;
+    slides.style.transform = `translateX(-${carouselStates[id] * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === carouselStates[id]));
+}
 
-    function moveCarousel(id, direction) {
-        if (!carouselStates[id]) carouselStates[id] = 0;
-        
-        const container = document.getElementById(`carousel-${id}`);
-        const slides = container.querySelector('.carousel-slides');
-        const dots = container.querySelectorAll('.dot');
-        const slideCount = slides.querySelectorAll('.slide').length;
+// ── Lightbox con navegación ──
+let lbImages = [];   // array de URLs del avance abierto
+let lbIndex  = 0;
 
-        carouselStates[id] = (carouselStates[id] + direction + slideCount) % slideCount;
-        
-        slides.style.transform = `translateX(-${carouselStates[id] * 100}%)`;
-        
-        dots.forEach((dot, index) => {
-            if (index === carouselStates[id]) dot.classList.add('active');
-            else dot.classList.remove('active');
+function openLightbox(imgs, index) {
+    lbImages = imgs;
+    lbIndex  = index;
+    document.getElementById('lightbox').style.display = 'flex';
+    renderLightbox();
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').style.display = 'none';
+}
+
+function lightboxMove(dir) {
+    lbIndex = (lbIndex + dir + lbImages.length) % lbImages.length;
+    renderLightbox();
+}
+
+function renderLightbox() {
+    const img     = document.getElementById('lightbox-img');
+    const counter = document.getElementById('lb-counter');
+    const thumbs  = document.getElementById('lb-thumbs');
+    const prev    = document.getElementById('lb-prev');
+    const next    = document.getElementById('lb-next');
+
+    // Fade rápido
+    img.style.opacity = '0';
+    setTimeout(() => {
+        img.src = lbImages[lbIndex];
+        img.style.opacity = '1';
+    }, 100);
+
+    // Contador
+    counter.textContent = lbImages.length > 1 ? `${lbIndex + 1} / ${lbImages.length}` : '';
+
+    // Flechas solo si hay más de 1
+    prev.style.display = next.style.display = lbImages.length > 1 ? 'flex' : 'none';
+
+    // Miniaturas
+    thumbs.innerHTML = '';
+    if (lbImages.length > 1) {
+        lbImages.forEach((src, i) => {
+            const t = document.createElement('img');
+            t.src   = src;
+            t.style.cssText = `width:52px;height:38px;object-fit:cover;border-radius:4px;
+                cursor:pointer;opacity:${i === lbIndex ? '1' : '0.45'};
+                border:2px solid ${i === lbIndex ? '#fff' : 'transparent'};
+                transition:opacity .15s,border-color .15s;flex-shrink:0;`;
+            t.addEventListener('click', () => { lbIndex = i; renderLightbox(); });
+            thumbs.appendChild(t);
         });
+        // Scroll a la miniatura activa
+        thumbs.children[lbIndex]?.scrollIntoView({ inline: 'center', behavior: 'smooth' });
     }
+}
 
-    function openLightbox(src) {
-        const lightbox = document.getElementById('lightbox');
-        const img = document.getElementById('lightbox-img');
-        img.src = src;
-        lightbox.style.display = 'flex';
-    }
+// ── Teclado ──
+document.addEventListener('keydown', e => {
+    if (document.getElementById('lightbox').style.display !== 'flex') return;
+    if (e.key === 'ArrowRight') lightboxMove(1);
+    if (e.key === 'ArrowLeft')  lightboxMove(-1);
+    if (e.key === 'Escape')     closeLightbox();
+});
+
+// ── Clic en fondo cierra ──
+document.getElementById('lightbox').addEventListener('click', function(e) {
+    if (e.target === this) closeLightbox();
+});
 </script>
