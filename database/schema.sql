@@ -203,8 +203,8 @@ CREATE TABLE IF NOT EXISTS auditoria (
 
 -- Usuario administrador por defecto (password: admin123)
 -- Hash generado con: password_hash('admin123', PASSWORD_DEFAULT)
-INSERT INTO usuarios (nombre_completo, correo, password, rol) VALUES 
-('Administrador Principal', 'admin@condominioterrazas.com', '$2y$10$kGJfZ8M5vN2pQ4rS6tU7vO.xW8yZ0aB2cD4eF6gH8iJ0kL2mN4oP', 'administrador');
+INSERT INTO usuarios (nombre_completo, correo, password, rol) VALUES
+('Administrador Principal', 'admin@condominioterrazas.com', '$2y$10$48fkMwYpt4QFxWslSrO5J.f/hJy9pHPz34HlSmT/iAVBMqSHZbU6u', 'administrador');
 
 -- Configuración del condominio
 INSERT INTO configuracion (clave, valor, descripcion) VALUES 
