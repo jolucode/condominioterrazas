@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Documentación — Sistema de Gestión Condominio Terrazas</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: #1a1a2e; background: #fff; padding: 40px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 26px; color: #1565c0; border-bottom: 3px solid #1565c0; padding-bottom: 10px; margin-bottom: 6px; }
+  h2 { font-size: 18px; color: #0d47a1; margin: 32px 0 10px; border-left: 4px solid #1565c0; padding-left: 10px; }
+  h3 { font-size: 15px; color: #1a237e; margin: 18px 0 8px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 30px; }
+  .section { margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #1565c0; color: #fff; padding: 8px 10px; text-align: left; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f8ff; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-red   { background: #ffebee; color: #c62828; }
+  .badge-orange{ background: #fff3e0; color: #e65100; }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-blue  { background: #e3f2fd; color: #1565c0; }
+  ul { padding-left: 20px; }
+  li { margin: 5px 0; line-height: 1.6; }
+  .box { background: #f5f8ff; border: 1px solid #c5cae9; border-radius: 6px; padding: 14px 18px; margin: 12px 0; }
+  .box-green  { background: #e8f5e9; border-color: #a5d6a7; }
+  .box-yellow { background: #fffde7; border-color: #fff176; }
+  .divider { border: none; border-top: 1px solid #e0e0e0; margin: 28px 0; }
+  code { background: #f5f5f5; padding: 1px 5px; border-radius: 3px; font-family: Consolas, monospace; font-size: 12px; color: #d32f2f; }
+  .print-btn { position: fixed; top: 20px; right: 20px; background: #1565c0; color: #fff; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .print-btn:hover { background: #0d47a1; }
+  @media print { .print-btn { display: none; } body { padding: 20px; } }
+  .cover { text-align: center; padding: 40px 0 30px; border-bottom: 2px solid #1565c0; margin-bottom: 36px; }
+  .cover h1 { border: none; font-size: 32px; }
+  .cover .version { margin-top: 12px; color: #666; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">🖨 Imprimir / Exportar PDF</button>
+
+<!-- PORTADA -->
+<div class="cover">
+  <h1>Sistema de Gestión<br>Condominio Las Terrazas de San Antonio</h1>
+  <p class="subtitle" style="font-size:15px;margin-top:12px;">Documentación Técnica y Funcional</p>
+  <p class="version">Versión 2.0 &nbsp;·&nbsp; Mayo 2026 &nbsp;·&nbsp; Desarrollado con PHP + MySQL</p>
+</div>
+
+<!-- 1. DESCRIPCIÓN GENERAL -->
+<h2>1. Descripción General del Sistema</h2>
+<div class="box">
+  El sistema es una aplicación web PHP para la gestión integral del <strong>Condominio Las Terrazas de San Antonio</strong>. Permite administrar propietarios, pagos de mantenimiento, inscripciones, membresías del club, reuniones, acuerdos y avances de obra. Cuenta con dos roles: <strong>Administrador</strong> y <strong>Propietario (Cliente)</strong>.
+</div>
+
+<table>
+  <tr><th>Aspecto</th><th>Detalle</th></tr>
+  <tr><td>Tecnología</td><td>PHP 8.3 sin framework · MySQL 8.4 · Apache</td></tr>
+  <tr><td>Hosting producción</td><td>InfinityFree — condterrazas.free.nf</td></tr>
+  <tr><td>Desarrollo local</td><td>Laragon (Windows) — localhost/condominioterrazas</td></tr>
+  <tr><td>Autenticación</td><td>Sesiones PHP · Roles: administrador / cliente</td></tr>
+  <tr><td>Acceso admin</td><td>admin@condominioterrazas.com / admin123</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- 2. MÓDULOS DEL SISTEMA -->
+<h2>2. Módulos del Sistema</h2>
+
+<h3>2.1 Módulos de Administración</h3>
+<table>
+  <tr><th>Módulo</th><th>Funcionalidad</th></tr>
+  <tr><td><strong>Clientes / Propietarios</strong></td><td>CRUD de propietarios. Un propietario puede tener múltiples lotes. Búsqueda en vivo por nombre, DNI o lote. Filtro por estado y etapa.</td></tr>
+  <tr><td><strong>Importar Excel</strong></td><td>Carga masiva de propietarios desde archivo .xlsx. Previsualización con detección de duplicados, campos incompletos y lotes duplicados en el mismo Excel. Crea usuario de acceso automáticamente (correo + DNI).</td></tr>
+  <tr><td><strong>Mantenimiento</strong></td><td>Gestión de pagos mensuales (S/. 70). Generación masiva por mes. Filtros por estado, mes, año y etapa. Botón WhatsApp con identificación del lote específico.</td></tr>
+  <tr><td><strong>Inscripciones</strong></td><td>Pago único de inscripción/empadronamiento (S/. 800 por lote). Registro individual o generación masiva para todos los propietarios sin inscripción.</td></tr>
+  <tr><td><strong>Membresía Club</strong></td><td>Membresía perpetua (S/. 5,000 en 20 cuotas de S/. 250). Plan generado automáticamente con fechas mensuales. Barra de progreso por propietario. Generación masiva para todos.</td></tr>
+  <tr><td><strong>Reuniones y Acuerdos</strong></td><td>Registro de reuniones con acuerdos, responsables y estado. Publicación a propietarios. Adjunto de actas en PDF descargables.</td></tr>
+  <tr><td><strong>Avances del Condominio</strong></td><td>Galería de avances de obra con carrusel multi-foto. Drag & drop para subir múltiples imágenes. Lightbox con navegación por flechas, teclado y miniaturas.</td></tr>
+  <tr><td><strong>Reportes</strong></td><td>Clientes, pagos por mes, pagos pendientes, pagos por cliente, reuniones, deuda consolidada. Filtros por etapa y tipo de pago. Exportación CSV. Botones WhatsApp masivos desde deuda consolidada.</td></tr>
+  <tr><td><strong>Dashboard</strong></td><td>Estadísticas de los 3 tipos de pago con barras de progreso. Deuda global total. Últimos pagos de todos los tipos.</td></tr>
+  <tr><td><strong>Usuarios</strong></td><td>Gestión de accesos al sistema.</td></tr>
+  <tr><td><strong>Configuración</strong></td><td>Datos del condominio, cuotas, series de comprobantes.</td></tr>
+</table>
+
+<h3>2.2 Panel del Propietario</h3>
+<table>
+  <tr><th>Sección</th><th>Funcionalidad</th></tr>
+  <tr><td><strong>Inicio</strong></td><td>Resumen de todos sus lotes con estado de mantenimiento del mes actual. Estadísticas consolidadas (cuotas pagadas, pendientes, deuda total).</td></tr>
+  <tr><td><strong>Mis Pagos</strong></td><td>3 tabs: Mantenimiento (filtro por año) · Inscripción · Membresía Club. Si tiene múltiples lotes, se muestra columna "Lote" en cada tabla. Alerta de deuda total al inicio.</td></tr>
+  <tr><td><strong>Mis Comprobantes</strong></td><td>Comprobantes emitidos de todos sus lotes.</td></tr>
+  <tr><td><strong>Reuniones y Acuerdos</strong></td><td>Historial de reuniones publicadas con acuerdos. Botón para descargar el acta PDF de cada reunión.</td></tr>
+  <tr><td><strong>Mi Perfil</strong></td><td>Información personal y tabla de todas sus propiedades (etapa, manzana, lote, fecha de compra).</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- 3. ESTRUCTURA DE DATOS -->
+<h2>3. Estructura de Tipos de Pago</h2>
+
+<table>
+  <tr><th>Tipo</th><th>Monto</th><th>Periodicidad</th><th>Diferenciador</th></tr>
+  <tr><td><span class="badge badge-blue">Mantenimiento</span></td><td>S/. 70.00</td><td>Mensual (último día)</td><td>cliente_id + mes + año</td></tr>
+  <tr><td><span class="badge badge-orange">Inscripción</span></td><td>S/. 800.00</td><td>Pago único por lote</td><td>lote + manzana + etapa</td></tr>
+  <tr><td><span class="badge badge-green">Membresía Club</span></td><td>S/. 5,000 (20 cuotas × S/. 250)</td><td>Mensual por 20 meses</td><td>cliente_id + cuota_numero</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- 4. PROBLEMAS ENCONTRADOS Y SOLUCIONES -->
+<h2>4. Problemas Encontrados y Soluciones Implementadas</h2>
+
+<h3>🔴 Críticos — Podían romper datos en producción</h3>
+<table>
+  <tr><th>#</th><th>Problema</th><th>Causa</th><th>Solución</th></tr>
+  <tr>
+    <td>1</td>
+    <td><strong>Numeración duplicada de comprobantes bajo carga</strong></td>
+    <td>Dos admins emitiendo boletas simultáneamente podían obtener el mismo número. La transacción no bloqueaba el registro del contador.</td>
+    <td>Implementado <code>SELECT FOR UPDATE</code> dentro de la transacción en <code>Comprobante::crearComprobante()</code>. El número se reserva atómicamente antes de insertar.</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><strong>CSRF invertido en importador</strong></td>
+    <td>La lógica <code>!validarTokenCSRF(...) === false</code> estaba invertida: rechazaba tokens válidos y permitía inválidos.</td>
+    <td>Corregida la condición. Agregado meta tag <code>csrf-token</code> en el layout y header <code>X-CSRF-Token</code> en las peticiones fetch del importador.</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><strong>Hash de contraseña admin truncado</strong></td>
+    <td>El hash bcrypt en <code>schema.sql</code> tenía 59 caracteres (necesita exactamente 60). Posiblemente se truncó al copiar/pegar.</td>
+    <td>Generado nuevo hash válido con <code>password_hash('admin123', PASSWORD_DEFAULT)</code> y actualizado en <code>schema.sql</code>.</td>
+  </tr>
+</table>
+
+<h3>🟠 Altos — Podían generar duplicados con múltiples usuarios</h3>
+<table>
+  <tr><th>#</th><th>Problema</th><th>Causa</th><th>Solución</th></tr>
+  <tr>
+    <td>4</td>
+    <td><strong>Race condition en generación masiva de pagos</strong></td>
+    <td><code>generarPagosMensuales()</code>: SELECT + INSERT fuera de transacción. Dos admins simultáneos podían insertar el mismo pago.</td>
+    <td><code>try/catch</code> capturando error de clave duplicada (<code>SQLSTATE 23000</code>). La UNIQUE KEY de BD actúa como última defensa.</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><strong>Race condition en generación de cuotas de membresía</strong></td>
+    <td><code>generarCuotasMembresia()</code>: loop de INSERTs sin transacción.</td>
+    <td><code>beginTransaction()</code> + <code>SELECT FOR UPDATE</code> para leer el máximo de cuotas existentes + <code>try/catch 23000</code>.</td>
+  </tr>
+</table>
+
+<h3>🟡 Medios — Bugs de código y comportamiento incorrecto</h3>
+<table>
+  <tr><th>#</th><th>Archivo</th><th>Problema</th><th>Solución</th></tr>
+  <tr>
+    <td>6</td>
+    <td><code>config_controller.php</code></td>
+    <td>Tags HTML mal cerrados: el <code>&lt;form&gt;</code> estaba dentro del primer <code>&lt;card-body&gt;</code> pero se cerraban las tarjetas antes de cerrar el form. El formulario no enviaba correctamente.</td>
+    <td>Reestructurado: el <code>&lt;form&gt;</code> ahora envuelve las 3 tarjetas completas.</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td><code>avance_controller.php</code></td>
+    <td><code>eliminarAvance()</code> llamaba <code>obtenerTodos()</code> (carga todos los avances de BD) solo para validar si existía uno por ID.</td>
+    <td>Reemplazado por <code>obtenerPorId($id)</code> con validación. También se corrigió <code>$_GET['id']</code> sin valor por defecto.</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td><code>Cliente.php</code> / <code>pago_controller.php</code></td>
+    <td>Fecha de vencimiento hardcodeada al día 27 y día 10 del mes respectivamente.</td>
+    <td>Cambiado a <code>date('Y-m-t', mktime(...))</code> — último día real del mes para cualquier mes/año.</td>
+  </tr>
+  <tr>
+    <td>9</td>
+    <td><code>usuario_controller.php</code></td>
+    <td><code>eliminarUsuario()</code> usaba <code>$modelo_usuario</code> sin instanciarla localmente. Error fatal al intentar eliminar un usuario.</td>
+    <td>Agregado <code>$modelo_usuario = new Usuario();</code> al inicio de la función.</td>
+  </tr>
+  <tr>
+    <td>10</td>
+    <td><code>cliente_panel.php</code></td>
+    <td>Al refactorizar de <code>$inscripcion</code> (singular) a <code>$inscripciones</code> (array), el tab de Inscripción en "Mis Pagos" seguía referenciando la variable antigua. PHP Warning visible en pantalla.</td>
+    <td>Corregida la referencia en los tabs a <code>$inscripciones</code> con <code>array_filter()</code> para conteo de pendientes.</td>
+  </tr>
+  <tr>
+    <td>11</td>
+    <td><code>avances/crear.php</code></td>
+    <td>El atributo <code>required</code> en un input de archivo oculto (<code>display:none</code>) bloqueaba silenciosamente el envío del formulario. El botón "Publicar Avance" no reaccionaba al hacer clic.</td>
+    <td>Eliminado <code>required</code> del input oculto. Validación implementada en JavaScript con mensaje de error visible.</td>
+  </tr>
+  <tr>
+    <td>12</td>
+    <td><code>avances/index.php</code></td>
+    <td>El lightbox solo guardaba la URL de la foto clickeada, sin saber cuáles eran las fotos anterior/siguiente del mismo avance. Las flechas no funcionaban.</td>
+    <td>Reescrito el lightbox para recibir el array completo de URLs del avance y el índice actual. Navegación con flechas, teclado (←/→/Esc) y miniaturas.</td>
+  </tr>
+  <tr>
+    <td>13</td>
+    <td><code>avances/crear.php</code></td>
+    <td>El área de subida de fotos al ser clickeada reemplazaba la selección anterior en vez de acumular. No había drag & drop real. Solo se podía agregar una foto por vez.</td>
+    <td>Implementado acumulador con <code>DataTransfer</code>. Selecciones sucesivas se suman. Drag & drop completo. Botón ✕ por foto para quitar individualmente. Anti-duplicados por nombre+tamaño.</td>
+  </tr>
+  <tr>
+    <td>14</td>
+    <td>Performance general</td>
+    <td><code>actualizarEstadosVencidos()</code> ejecutaba un UPDATE masivo en cada carga de página, recorriendo todos los pagos incluyendo inscripciones y membresías con fecha NULL.</td>
+    <td>Agregado filtro <code>fecha_vencimiento IS NOT NULL</code> para excluir registros sin fecha y reducir el scan.</td>
+  </tr>
+</table>
+
+<h3>🟢 CSRF faltante en formularios POST</h3>
+<p style="margin:8px 0 10px;">Ningún formulario POST tenía protección CSRF excepto Configuración. Un atacante podía engañar a un admin autenticado para ejecutar acciones sin saberlo.</p>
+<table>
+  <tr><th>Controlador</th><th>Acciones protegidas</th></tr>
+  <tr><td><code>cliente_controller.php</code></td><td>crear, editar</td></tr>
+  <tr><td><code>pago_controller.php</code></td><td>registrar, marcar_pagado, editar, generar_pagos</td></tr>
+  <tr><td><code>reunion_controller.php</code></td><td>crear, editar</td></tr>
+  <tr><td><code>comprobante_controller.php</code></td><td>emitir</td></tr>
+  <tr><td><code>avance_controller.php</code></td><td>crear</td></tr>
+  <tr><td><code>inscripcion_controller.php</code></td><td>registrar, marcar_pagado, generar_masivo</td></tr>
+  <tr><td><code>membresia_controller.php</code></td><td>registrar, marcar_cuota, generar_masivo</td></tr>
+  <tr><td><code>importar_controller.php</code></td><td>importar (via header HTTP)</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- 5. NUEVAS FUNCIONALIDADES -->
+<h2>5. Nuevas Funcionalidades Implementadas</h2>
+
+<table>
+  <tr><th>Funcionalidad</th><th>Descripción</th></tr>
+  <tr>
+    <td><strong>Módulo de Inscripciones</strong></td>
+    <td>Registro del pago único de inscripción (S/. 800) por lote. Listado con filtros por estado y etapa. Generación masiva para todos los propietarios sin inscripción. Botón de recordatorio WhatsApp individual.</td>
+  </tr>
+  <tr>
+    <td><strong>Módulo de Membresía Club</strong></td>
+    <td>Plan de 20 cuotas mensuales de S/. 250. Barra de progreso por propietario. Generación masiva configurable (cuotas y monto modificables). Fechas calculadas automáticamente. WhatsApp con deuda total.</td>
+  </tr>
+  <tr>
+    <td><strong>Vista consolidada por propietario (Admin)</strong></td>
+    <td>Al ver un cliente: tabla resumen de los 3 tipos de pago con totales, deuda y acceso directo. Tabs: Mantenimiento · Inscripción · Membresía. Botones de pago rápido desde el perfil.</td>
+  </tr>
+  <tr>
+    <td><strong>Panel multi-lote del propietario</strong></td>
+    <td>Un propietario con múltiples lotes ve TODOS sus lotes al iniciar sesión. Inicio: tabla de lotes con estado del mes. Mis Pagos: pagos de todos los lotes agrupados con columna "Lote". Mi Perfil: tabla de todas sus propiedades.</td>
+  </tr>
+  <tr>
+    <td><strong>Importación masiva desde Excel</strong></td>
+    <td>SheetJS lee el archivo en el navegador (sin subir al servidor). Previsualización con 3 estados: Nuevo (verde) · Ya existe (amarillo) · Incompleto/Duplicado (rojo con campo que falta). Detección de lotes duplicados dentro del mismo Excel.</td>
+  </tr>
+  <tr>
+    <td><strong>Reporte de Deuda Consolidada</strong></td>
+    <td>Tabla de todos los propietarios con deuda en los 3 tipos de pago. Totales por tipo y gran total. Filtro por etapa. Exportación CSV. Botón WhatsApp por propietario con deuda total resumida.</td>
+  </tr>
+  <tr>
+    <td><strong>Dashboard mejorado</strong></td>
+    <td>Tabla de recaudación por tipo (mantenimiento/inscripción/membresía) con porcentaje cobrado y barras de progreso. Stat de deuda global total. Últimos pagos con icono por tipo.</td>
+  </tr>
+  <tr>
+    <td><strong>Filtro por Etapa</strong></td>
+    <td>Agregado en: Gestión de Pagos · Inscripciones · Membresía · Reporte por mes · Reporte de pendientes. Las etapas se cargan dinámicamente desde la BD.</td>
+  </tr>
+  <tr>
+    <td><strong>Actas de reuniones descargables</strong></td>
+    <td>Al crear/editar una reunión se puede adjuntar el acta en PDF. Disponible para descarga desde la vista admin y desde el panel del propietario en el timeline de reuniones.</td>
+  </tr>
+  <tr>
+    <td><strong>Creación automática de usuarios</strong></td>
+    <td>Al registrar un cliente (manual o por Excel), se crea automáticamente su acceso al sistema. Usuario = correo, contraseña = DNI. Si el correo ya tiene cuenta, se omite sin error.</td>
+  </tr>
+  <tr>
+    <td><strong>Multi-lote en clientes</strong></td>
+    <td>Un mismo propietario (mismo DNI) puede tener múltiples lotes. El diferenciador único es lote + manzana + etapa. El listado muestra columnas Etapa y Manzana. La importación lo gestiona automáticamente.</td>
+  </tr>
+  <tr>
+    <td><strong>Fecha de compra</strong></td>
+    <td>Columna <code>fecha_compra</code> en clientes visible en listado, formularios y Excel. Formato D/MM/YYYY en la importación, almacenada como DATE en BD.</td>
+  </tr>
+  <tr>
+    <td><strong>Modo oscuro en panel del propietario</strong></td>
+    <td>Botón luna/sol disponible también en el layout del cliente. El tema persiste en localStorage entre sesiones.</td>
+  </tr>
+  <tr>
+    <td><strong>WhatsApp con identificación del lote</strong></td>
+    <td>Los mensajes de recordatorio de mantenimiento incluyen el lote específico: "cuota de Mayo 2026 correspondiente al Lote J16, Mz A, Etapa 3". Esencial cuando un propietario tiene múltiples lotes.</td>
+  </tr>
+</table>
+
+<hr class="divider">
+
+<!-- 6. CAMBIOS DE BASE DE DATOS -->
+<h2>6. Cambios en la Base de Datos</h2>
+
+<table>
+  <tr><th>Tabla</th><th>Cambio</th><th>Motivo</th></tr>
+  <tr>
+    <td><code>pagos</code></td>
+    <td>Nuevas columnas: <code>tipo_pago</code> ENUM · <code>cuota_numero</code> TINYINT · <code>total_cuotas</code> TINYINT. <code>mes</code> y <code>anio</code> ahora son nullable.</td>
+    <td>Soportar 3 tipos de pago en una sola tabla. Inscripción y membresía no tienen mes/año.</td>
+  </tr>
+  <tr>
+    <td><code>pagos</code></td>
+    <td>Índice único cambiado de <code>(cliente_id, mes, anio)</code> a <code>(cliente_id, tipo_pago, mes, anio)</code>.</td>
+    <td>Permitir un registro de mantenimiento por mes/año, uno de inscripción por cliente, y cuotas de membresía por número.</td>
+  </tr>
+  <tr>
+    <td><code>clientes</code></td>
+    <td>Eliminado UNIQUE en <code>dni</code> y en <code>correo</code>. Agregado UNIQUE <code>(numero_lote, manzana, etapa)</code>.</td>
+    <td>Un mismo propietario puede tener múltiples lotes. El lote físico es el identificador único, no la persona.</td>
+  </tr>
+  <tr>
+    <td><code>clientes</code></td>
+    <td>Nueva columna <code>fecha_compra DATE NULL</code>.</td>
+    <td>Registrar la fecha en que el propietario adquirió su lote.</td>
+  </tr>
+</table>
+
+<hr class="divider">
+
+<!-- 7. ESTRUCTURA DE ARCHIVOS -->
+<h2>7. Archivos Nuevos Creados</h2>
+
+<table>
+  <tr><th>Archivo</th><th>Descripción</th></tr>
+  <tr><td><code>controllers/inscripcion_controller.php</code></td><td>Módulo completo de inscripciones (CRUD + masivo + WhatsApp)</td></tr>
+  <tr><td><code>controllers/membresia_controller.php</code></td><td>Módulo completo de membresía perpetua (plan de cuotas + masivo)</td></tr>
+  <tr><td><code>controllers/importar_controller.php</code></td><td>Importación masiva desde Excel con SheetJS</td></tr>
+  <tr><td><code>controllers/archivo_controller.php</code></td><td>Descarga segura de archivos adjuntos (requiere autenticación)</td></tr>
+</table>
+
+<hr class="divider">
+
+<!-- 8. ARQUITECTURA -->
+<h2>8. Arquitectura y Capacidad</h2>
+
+<div class="two-col">
+  <div class="box box-green">
+    <strong>✅ Fortalezas</strong>
+    <ul style="margin-top:8px;">
+      <li>PHP sin framework — cero overhead</li>
+      <li>Singleton PDO — una conexión por request</li>
+      <li>SELECT FOR UPDATE en numeración de comprobantes</li>
+      <li>CSRF en todos los formularios POST</li>
+      <li>Auto-detección local vs producción</li>
+      <li>Sin Composer, sin npm — cero dependencias</li>
+      <li>CDNs para Font Awesome y SheetJS</li>
+      <li>~6 MB total a desplegar</li>
+    </ul>
+  </div>
+  <div class="box">
+    <strong>📊 Capacidad estimada</strong>
+    <ul style="margin-top:8px;">
+      <li>Propietarios registrados: ilimitado</li>
+      <li>Lotes por propietario: ilimitado</li>
+      <li>Usuarios simultáneos: 20–50 (hosting gratuito)</li>
+      <li>Pico realista condominio: 5–15 simultáneos</li>
+      <li>Almacenamiento InfinityFree: hasta 5 GB</li>
+    </ul>
+    <p style="margin-top:10px;font-size:12px;color:#666;">Para 260+ lotes con uso esporádico (1×/mes), el sistema está sobredimensionado. Perfectamente adecuado.</p>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- 9. CREDENCIALES -->
+<h2>9. Accesos del Sistema</h2>
+
+<table>
+  <tr><th>Rol</th><th>Usuario</th><th>Contraseña</th><th>URL</th></tr>
+  <tr>
+    <td>Administrador</td>
+    <td>admin@condominioterrazas.com</td>
+    <td>admin123</td>
+    <td>/index.php</td>
+  </tr>
+  <tr>
+    <td>Propietario</td>
+    <td>correo del propietario</td>
+    <td>DNI (8 dígitos)</td>
+    <td>/controllers/cliente_panel.php</td>
+  </tr>
+</table>
+
+<div class="box box-yellow" style="margin-top:14px;">
+  <strong>⚠️ Recomendación de seguridad:</strong> Cambiar la contraseña del administrador después del primer acceso en producción. Ir a Usuarios → editar → nueva contraseña.
+</div>
+
+<hr class="divider">
+
+<!-- PIE -->
+<p style="text-align:center;color:#999;font-size:12px;margin-top:30px;">
+  Sistema de Gestión — Condominio Las Terrazas de San Antonio &nbsp;·&nbsp; Versión 2.0 &nbsp;·&nbsp; Mayo 2026
+</p>
+
+</body>
+</html>
